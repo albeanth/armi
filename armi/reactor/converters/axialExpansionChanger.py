@@ -13,6 +13,7 @@
 # limitations under the License.
 """enable component-wise axial expansion for assemblies and/or a reactor"""
 
+import collections
 from statistics import mean
 from numpy import array
 from armi import runLog
@@ -144,6 +145,104 @@ class AxialExpansionChanger:
                 msg = "Cannot run detailedAxialExpansion without a dummy block at the top of the assembly!"
                 runLog.error(msg)
                 raise RuntimeError(msg)
+
+    def axiallyExpandControlAssembly(self, thermal: bool = False):
+        """expand control assembly; allows the downward expansion of components"""
+        componentsToExpandDown = collections.defaultdict(list)
+        mesh = [0.0]
+        # numOfBlocks = self.linked.a.countBlocksWithFlags()
+        runLog.debug(
+            "Printing component expansion information (growth percentage and 'target component')"
+            "for each block in assembly {0}.".format(self.linked.a)
+        )
+        # grow components, align, and redistribute blocks
+        for ib,b in enumerate(self.linked.a):
+            runLog.debug(msg="  Block {0}".format(b))
+            if thermal:
+                blockHeight = b.p.heightBOL
+            else:
+                blockHeight = b.p.height
+            
+            ## grow all the blocks
+            for c in b:
+                growFrac = self.expansionData.getExpansionFactor(c)
+                runLog.debug(
+                    msg="      Component {0}, growFrac = {1:.4e}".format(
+                        c, growFrac
+                    )
+                )
+                if thermal and self.expansionData.componentReferenceHeight:
+                    blockHeight = self.expansionData.componentReferenceHeight[c]
+                if growFrac >= 0.0:
+                    c.height = (1.0 + growFrac) * blockHeight
+                else:
+                    c.height = (1.0 / (1.0 - growFrac)) * blockHeight
+                
+                ## align upward expanding components
+                if ib == 0:
+                    c.zbottom = 0.0
+                else:
+                    if not c.expandsDownwards:
+                        if self.linked.linkedComponents[c][0] is not None:
+                            # use linked components below
+                            c.zbottom = self.linked.linkedComponents[c][0].ztop
+                        else:
+                            # otherwise there aren't any linked components
+                            # so just set the bottom of the component to
+                            # the top of the block below it
+                            c.zbottom = self.linked.linkedBlocks[b][0].p.ztop
+                        c.ztop = c.zbottom + c.height
+                    else:
+                        componentsToExpandDown[b].append(c)
+                        topAnchorForDownwardExpansion = b.p.ztop
+        
+        # align downward expanding components
+        blockList = list(componentsToExpandDown.keys())
+        componentPerBlockList = list(componentsToExpandDown.values())
+        for ib,b in reversed(list(enumerate(blockList))):
+            for c in componentPerBlockList[ib]:
+                if ib == 0:
+                    c.ztop = topAnchorForDownwardExpansion
+                else:
+                    if self.linked.linkedComponents[c][1] is not None:
+                        # use linked components above
+                        c.ztop = self.linked.linkedComponents[c][1].zbottom
+                    else:
+                        # otherwise there aren't any linked components
+                        # so just set the top of the component to
+                        # the bottom of the block above it
+                        c.ztop = self.linked.linkedBlocks[b][1].p.zbottom
+                c.zbottom = c.ztop - c.height
+
+        #redistribute block bounds if on the target component
+        for ib,b in enumerate(self.linked.a[:-1]):
+            # if ib == 0, leave block bottom = 0.0
+            if ib > 0:
+                b.p.zbottom = self.linked.linkedBlocks[b][0].p.ztop
+            for c in b:
+                if self.expansionData.isTargetComponent(c):
+                    runLog.debug(
+                        "      Component {0} is target component".format(c)
+                    )
+                    b.p.ztop = c.ztop
+            
+            # see also b.setHeight()
+            # - the above not chosen due to call to calculateZCoords
+            oldComponentVolumes = [c.getVolume() for c in b]
+            oldHeight = b.getHeight()
+            b.p.height = b.p.ztop - b.p.zbottom
+            _checkBlockHeight(b)
+            _conserveComponentMass(b, oldHeight, oldComponentVolumes)
+            # set block mid point and redo mesh
+            # - functionality based on assembly.calculateZCoords()
+            b.p.z = b.p.zbottom + b.p.height / 2.0
+            mesh.append(b.p.ztop)
+            b.spatialLocator = self.linked.a.spatialGrid[0, 0, ib]
+
+        # pylint: disable = protected-access
+        bounds = list(self.linked.a.spatialGrid._bounds)
+        bounds[2] = array(mesh)
+        self.linked.a.spatialGrid._bounds = tuple(bounds)
 
     def axiallyExpandAssembly(self, thermal: bool = False):
         """Utilizes assembly linkage to do axial expansion
