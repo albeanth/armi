@@ -156,7 +156,9 @@ class ComponentBlueprint(yamlize.Object):
     orientation = yamlize.Attribute(type=str, default=None)
     mergeWith = yamlize.Attribute(type=str, default=None)
     area = yamlize.Attribute(type=float, default=None)
-    axiallyExpandsDownwards = yamlize.Attribute(type=bool, default=False, key="axially expands downwards")
+    axiallyExpandsDownwards = yamlize.Attribute(
+        type=bool, default=False, key="axially expands downwards"
+    )
 
     def construct(self, blueprint, matMods):
         """Construct a component or group"""
