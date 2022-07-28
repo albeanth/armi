@@ -150,7 +150,7 @@ class AxialExpansionChanger:
         """expand control assembly; allows the downward expansion of components"""
         componentsToExpandDown = collections.defaultdict(list)
         mesh = [0.0]
-        # numOfBlocks = self.linked.a.countBlocksWithFlags()
+        numOfBlocks = self.linked.a.countBlocksWithFlags()
         runLog.debug(
             "Printing component expansion information (growth percentage and 'target component')"
             "for each block in assembly {0}.".format(self.linked.a)
@@ -162,27 +162,40 @@ class AxialExpansionChanger:
                 blockHeight = b.p.heightBOL
             else:
                 blockHeight = b.p.height
-            
-            ## grow all the blocks
-            for c in b:
-                growFrac = self.expansionData.getExpansionFactor(c)
-                runLog.debug(
-                    msg="      Component {0}, growFrac = {1:.4e}".format(
-                        c, growFrac
+            # set bottom of block equal to top of block below it
+            # if ib == 0, leave block bottom = 0.0
+            if ib > 0:
+                b.p.zbottom = self.linked.linkedBlocks[b][0].p.ztop
+            # if not in the dummy block, get expansion factor, do alignment, and modify block
+            if ib < (numOfBlocks - 1):
+                ## grow all the components
+                for c in b:
+                    growFrac = self.expansionData.getExpansionFactor(c)
+                    runLog.debug(
+                        msg="      Component {0}, growFrac = {1:.4e}".format(
+                            c, growFrac
+                        )
                     )
-                )
-                if thermal and self.expansionData.componentReferenceHeight:
-                    blockHeight = self.expansionData.componentReferenceHeight[c]
-                if growFrac >= 0.0:
-                    c.height = (1.0 + growFrac) * blockHeight
-                else:
-                    c.height = (1.0 / (1.0 - growFrac)) * blockHeight
-                
-                ## align upward expanding components
-                if ib == 0:
-                    c.zbottom = 0.0
-                else:
-                    if not c.expandsDownwards:
+                    if thermal and self.expansionData.componentReferenceHeight:
+                        blockHeight = self.expansionData.componentReferenceHeight[c]
+                    if growFrac >= 0.0:
+                        c.height = (1.0 + growFrac) * blockHeight
+                    else:
+                        c.height = (1.0 / (1.0 - growFrac)) * blockHeight
+                    
+                    ## align upward expanding components
+                    # - except for control pins within control bundle (those are specially handled)
+                    if ib == 0:
+                        c.zbottom = 0.0
+                    else:
+                        if c.axiallyExpandsDownwards:
+                            componentsToExpandDown[b].append(c)
+                            # topAnchorForDownwardExpansion will overwrite itself 
+                            # until at top most block with components that can expand downwards
+                            topAnchorForDownwardExpansion = b.p.ztop
+                            continue
+                        if c.hasFlags(Flags.CONTROL):
+                            continue
                         if self.linked.linkedComponents[c][0] is not None:
                             # use linked components below
                             c.zbottom = self.linked.linkedComponents[c][0].ztop
@@ -191,17 +204,15 @@ class AxialExpansionChanger:
                             # so just set the bottom of the component to
                             # the top of the block below it
                             c.zbottom = self.linked.linkedBlocks[b][0].p.ztop
-                        c.ztop = c.zbottom + c.height
-                    else:
-                        componentsToExpandDown[b].append(c)
-                        topAnchorForDownwardExpansion = b.p.ztop
+                    c.ztop = c.zbottom + c.height
         
         # align downward expanding components
+        # new c.height is set, but c.zbottom and c.ztop need to be set
         blockList = list(componentsToExpandDown.keys())
         componentPerBlockList = list(componentsToExpandDown.values())
         for ib,b in reversed(list(enumerate(blockList))):
             for c in componentPerBlockList[ib]:
-                if ib == 0:
+                if ib == len(blockList)-1:
                     c.ztop = topAnchorForDownwardExpansion
                 else:
                     if self.linked.linkedComponents[c][1] is not None:
@@ -214,17 +225,29 @@ class AxialExpansionChanger:
                         c.ztop = self.linked.linkedBlocks[b][1].p.zbottom
                 c.zbottom = c.ztop - c.height
 
-        #redistribute block bounds if on the target component
-        for ib,b in enumerate(self.linked.a[:-1]):
+        # align upward expanding pin components within control rod bundle. 
+        # new c.height is set, but c.zbottom and c.ztop need to be set
+        for ib,b in enumerate(self.linked.a.getChildrenWithFlags(Flags.CONTROL)):
+            c = _getControlPin(b)
+            if ib == 0:
+                c.zbottom = b.p.zbottom
+            else:
+                c.zbottom = self.linked.linkedComponents[c][0].ztop
+            c.ztop = c.zbottom + c.height
+
+        # redistribute block bounds if on the target component
+        for ib,b in enumerate(self.linked.a):
             # if ib == 0, leave block bottom = 0.0
             if ib > 0:
                 b.p.zbottom = self.linked.linkedBlocks[b][0].p.ztop
-            for c in b:
-                if self.expansionData.isTargetComponent(c):
-                    runLog.debug(
-                        "      Component {0} is target component".format(c)
-                    )
-                    b.p.ztop = c.ztop
+            if ib < len(self.linked.a)-1:
+                for c in b:
+                    if self.expansionData.isTargetComponent(c):
+                        runLog.debug(
+                            "      Component {0} is target component".format(c)
+                        )
+                        b.p.ztop = c.ztop
+                        break
             
             # see also b.setHeight()
             # - the above not chosen due to call to calculateZCoords
@@ -360,6 +383,17 @@ class AxialExpansionChanger:
         for old, new in zip(oldMesh, r.core.p.axialMesh):
             runLog.extra(f"{old:.6e}\t{new:.6e}")
 
+def _getControlPin(b):
+    """return control pin in control block"""
+    controlComps = b.getChildrenWithFlags(Flags.CONTROL)
+    if len(controlComps) > 1:
+        raise RuntimeError(
+            f"Block {b} has multiple control pin components! "
+            "The axial expansion changer is currently only set up to manage one "
+            "control pin component per control block."
+            "Returned Components = {controlComps}"
+        )
+    return controlComps[0]
 
 def _conserveComponentMass(b, oldHeight, oldVolume):
     """Update block height dependent component parameters

@@ -2294,11 +2294,13 @@ class Core(composites.Composite):
                 )
                 axialExpChngr = AxialExpansionChanger(cs["detailedAxialExpansion"])
                 for a in self.getAssemblies():
+                    axialExpChngr.setAssembly(a)
+                    axialExpChngr.expansionData.computeThermalExpansionFactors()
                     if not a.hasFlags(Flags.CONTROL):
-                        axialExpChngr.setAssembly(a)
-                        axialExpChngr.expansionData.computeThermalExpansionFactors()
                         axialExpChngr.axiallyExpandAssembly(thermal=True)
-                axialExpChngr._manageCoreMesh(self.parent)
+                    else:
+                        axialExpChngr.axiallyExpandControlAssembly(thermal=True)
+                axialExpChngr.manageCoreMesh(self.parent)
 
         self.numRings = self.getNumRings()  # TODO: why needed?
 
