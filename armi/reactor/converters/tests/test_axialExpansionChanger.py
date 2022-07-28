@@ -173,7 +173,7 @@ class TestAxialExpansionHeight(Base, unittest.TestCase):
 
     def setUp(self):
         Base.setUp(self)
-        self.a = buildTestAssemblyWithFakeMaterial(name="FakeMat")
+        self.a = buildTestAssemblyWithFakeMaterial()
 
         self.temp = Temperature(
             self.a.getTotalHeight(), numTempGridPts=11, tempSteps=10
@@ -225,7 +225,7 @@ class TestAxialExpansionHeight(Base, unittest.TestCase):
 
     def _generateComponentWiseExpectedHeight(self):
         """calculate the expected height, external of AssemblyAxialExpansion()"""
-        assem = buildTestAssemblyWithFakeMaterial(name="FakeMat")
+        assem = buildTestAssemblyWithFakeMaterial()
         aveBlockTemp = zeros((len(assem), self.temp.tempSteps))
         self.trueZtop = zeros((len(assem), self.temp.tempSteps))
         self.trueHeight = zeros((len(assem), self.temp.tempSteps))
@@ -262,12 +262,46 @@ class TestAxialExpansionHeight(Base, unittest.TestCase):
         return mean(tmpMapping)
 
 
+class TestControlAssemblyExpansion(unittest.TestCase):
+    """ensure control assemblies are expanded as expected"""
+
+    def setUp(self):
+        self.axExpChngr = AxialExpansionChanger()
+        self.a = buildTestAssemblyWithFakeMaterial(control=True)
+
+    def test_prescribedAxialExpansion(self):
+        correctPostExpansionBlockHeights = [11.0, 7.6, 11.0, 10.4, 12.5, 7.5]
+        componentList = []
+        percentList = []
+        for b in self.a:
+            for c in b:
+                componentList.append(c)
+                if c.hasFlags(Flags.DUCT):
+                    percentList.append(0.05)
+                elif c.hasFlags(Flags.CLAD):
+                    percentList.append(0.07)
+                elif c.hasFlags([Flags.SHIELD, Flags.CONTROL]):
+                    percentList.append(0.1)
+                else:
+                    percentList.append(0.0)
+        self.axExpChngr.performPrescribedAxialExpansion(
+            self.a, componentList, percentList, CRA=True
+        )
+        for ib, b in enumerate(self.a):
+            self.assertAlmostEqual(
+                correctPostExpansionBlockHeights[ib],
+                b.getHeight(),
+                msg="Post expansion block height is incorrect for block {0}. \n"
+                "The z-coords are: {1:.4f}, {2:.4f}".format(b, b.p.zbottom, b.p.ztop),
+            )
+
+
 class TestConservation(Base, unittest.TestCase):
     """verify that conservation is maintained in assembly-level axial expansion"""
 
     def setUp(self):
         Base.setUp(self)
-        self.a = buildTestAssemblyWithFakeMaterial(name="FakeMat")
+        self.a = buildTestAssemblyWithFakeMaterial()
 
     def expandAssemForMassConservationTest(self):
         """initialize class variables for mass conservation checks"""
@@ -297,7 +331,7 @@ class TestConservation(Base, unittest.TestCase):
         - temperature field is isothermal and initially at 25 C
         """
         isothermalTempList = [20.0, 25.0, 30.0]
-        a = buildTestAssemblyWithFakeMaterial(name="FakeMat")
+        a = buildTestAssemblyWithFakeMaterial()
         originalMesh = a.getAxialMesh()
         axialExpChngr = AxialExpansionChanger(detailedAxialExpansion=True)
 
@@ -341,7 +375,7 @@ class TestConservation(Base, unittest.TestCase):
         - temperature field is isothermal and initially at 250 C
         """
         isothermalTempList = [200.0, 250.0, 300.0]
-        a = buildTestAssemblyWithFakeMaterial(name="FakeMat", hot=True)
+        a = buildTestAssemblyWithFakeMaterial(hot=True)
         originalMesh = a.getAxialMesh()
         axialExpChngr = AxialExpansionChanger(detailedAxialExpansion=True)
 
@@ -387,7 +421,7 @@ class TestConservation(Base, unittest.TestCase):
         - 10 total expansion steps: 5 at +1%, and 5 at -1%
         - assertion on if original axial mesh matches the final axial mesh
         """
-        a = buildTestAssemblyWithFakeMaterial(name="FakeMat")
+        a = buildTestAssemblyWithFakeMaterial()
         obj = AxialExpansionChanger()
         oldMesh = a.getAxialMesh()
         componentLst = [c for b in a for c in b]
@@ -561,7 +595,7 @@ class TestExceptions(Base, unittest.TestCase):
 
     def setUp(self):
         Base.setUp(self)
-        self.a = buildTestAssemblyWithFakeMaterial(name="FakeMatException")
+        self.a = buildTestAssemblyWithFakeMaterial(exceptionTesting=True)
         self.obj.setAssembly(self.a)
 
     def test_isTopDummyBlockPresent(self):
@@ -710,7 +744,7 @@ class TestDetermineTargetComponent(unittest.TestCase):
 
     def setUp(self):
         self.obj = AxialExpansionChanger()
-        self.a = buildTestAssemblyWithFakeMaterial(name="FakeMatException")
+        self.a = buildTestAssemblyWithFakeMaterial(exceptionTesting=True)
         self.obj.setAssembly(self.a)
         # need an empty dictionary because we want to test for the added component only
         self.obj.expansionData._componentDeterminesBlockHeight = {}
@@ -833,9 +867,6 @@ class TestInputHeightsConsideredHot(unittest.TestCase):
             2. in armi.tests.detailedAxialExpansion.refSmallReactorBase.yaml,
                Thot > Tinput resulting in a non-zero DeltaT. Each block in the
                expanded case should therefore be a different height than that of the standard case.
-               - The one exception is for control assemblies. These designs can be unique from regular
-                 pin type assemblies by allowing downward expansion. Because of this, they are skipped
-                 for axial expansion.
         """
         for aStd, aExp in zip(self.stdAssems, self.testAssems):
             self.assertAlmostEqual(
@@ -849,7 +880,7 @@ class TestInputHeightsConsideredHot(unittest.TestCase):
                 hasCustomMaterial = any(
                     isinstance(c.material, custom.Custom) for c in bStd
                 )
-                if (aStd.hasFlags(Flags.CONTROL)) or (hasCustomMaterial):
+                if hasCustomMaterial:
                     checkColdBlockHeight(bStd, bExp, self.assertAlmostEqual, "the same")
                 else:
                     checkColdBlockHeight(bStd, bExp, self.assertNotEqual, "different")
@@ -1062,14 +1093,24 @@ class TestLinkage(unittest.TestCase):
         self.assertFalse(_determineLinked(comp1, comp2))
 
 
-def buildTestAssemblyWithFakeMaterial(name: str, hot: bool = False):
+def buildTestAssemblyWithFakeMaterial(
+    control: bool = False, exceptionTesting: bool = False, hot: bool = False
+):
     """Create test assembly consisting of list of fake material
 
     Parameters
     ----------
-    name : string
-        determines which fake material to use
+    exceptionTesting : bool, optional
+        determines which material to assign to test assembly. If True, uses a material with
+        a thermal expansion factor large enough to generate exceptions in axialExpansionChanger
+
+    hot: bool, optional
+        determines if the test assembly is initially hot (250 C). If False, assembly is cold (25 C)
     """
+    name = "FakeMat"
+    if exceptionTesting:
+        name = "FakeMatException"
+
     if not hot:
         hotTemp = 25.0
         height = 10.0
@@ -1081,16 +1122,32 @@ def buildTestAssemblyWithFakeMaterial(name: str, hot: bool = False):
     assembly.spatialGrid = grids.axialUnitGrid(numCells=1)
     assembly.spatialGrid.armiObject = assembly
     assembly.add(_buildTestBlock("shield", name, hotTemp, height))
-    assembly.add(_buildTestBlock("fuel", name, hotTemp, height))
-    assembly.add(_buildTestBlock("fuel", name, hotTemp, height))
-    assembly.add(_buildTestBlock("plenum", name, hotTemp, height))
+    if not control:
+        assembly.add(_buildTestBlock("fuel", name, hotTemp, height))
+        assembly.add(_buildTestBlock("fuel", name, hotTemp, height))
+        assembly.add(_buildTestBlock("plenum", name, hotTemp, height))
+    else:
+        assembly.add(_buildTestBlock("duct", name, hotTemp, height))
+        assembly.add(
+            _buildTestBlock("control", name, hotTemp, height, expandsDownward=True)
+        )
+        assembly.add(
+            _buildTestBlock("plenum", name, hotTemp, height, expandsDownward=True)
+        )
+        assembly.add(_buildTestBlock("duct", name, hotTemp, height))
     assembly.add(_buildDummySodium(hotTemp, height))
     assembly.calculateZCoords()
     assembly.reestablishBlockOrder()
     return assembly
 
 
-def _buildTestBlock(blockType: str, name: str, hotTemp: float, height: float):
+def _buildTestBlock(
+    blockType: str,
+    name: str,
+    hotTemp: float,
+    height: float,
+    expandsDownward: bool = False,
+):
     """Return a simple pin type block filled with coolant and surrounded by duct.
 
     Parameters
@@ -1103,7 +1160,7 @@ def _buildTestBlock(blockType: str, name: str, hotTemp: float, height: float):
     """
     b = HexBlock(blockType, height=height)
 
-    fuelDims = {"Tinput": 25.0, "Thot": hotTemp, "od": 0.76, "id": 0.00, "mult": 127.0}
+    pinDims = {"Tinput": 25.0, "Thot": hotTemp, "od": 0.76, "id": 0.00, "mult": 127.0}
     cladDims = {"Tinput": 25.0, "Thot": hotTemp, "od": 0.80, "id": 0.77, "mult": 127.0}
     ductDims = {"Tinput": 25.0, "Thot": hotTemp, "op": 16, "ip": 15.3, "mult": 1.0}
     intercoolantDims = {
@@ -1114,15 +1171,22 @@ def _buildTestBlock(blockType: str, name: str, hotTemp: float, height: float):
         "mult": 1.0,
     }
     coolDims = {"Tinput": 25.0, "Thot": hotTemp}
-    mainType = Circle(blockType, name, **fuelDims)
+    if blockType == "plenum":
+        mainType = Circle(blockType, "Void", **pinDims)
+    else:
+        mainType = Circle(blockType, name, **pinDims)
     clad = Circle("clad", name, **cladDims)
     duct = Hexagon("duct", name, **ductDims)
 
     coolant = DerivedShape("coolant", "Sodium", **coolDims)
     intercoolant = Hexagon("intercoolant", "Sodium", **intercoolantDims)
 
-    b.add(mainType)
-    b.add(clad)
+    if expandsDownward:
+        clad.axiallyExpandsDownwards = True
+
+    if blockType != "duct":
+        b.add(mainType)
+        b.add(clad)
     b.add(duct)
     b.add(coolant)
     b.add(intercoolant)

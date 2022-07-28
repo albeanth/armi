@@ -63,7 +63,12 @@ class AxialExpansionChanger:
         self.expansionData = None
 
     def performPrescribedAxialExpansion(
-        self, a, componentLst: list, percents: list, setFuel=True
+        self,
+        a,
+        componentLst: list,
+        percents: list,
+        setFuel: bool = True,
+        CRA: bool = False,
     ):
         """Perform axial expansion of an assembly given prescribed expansion percentages
 
@@ -85,7 +90,10 @@ class AxialExpansionChanger:
         """
         self.setAssembly(a, setFuel)
         self.expansionData.setExpansionFactors(componentLst, percents)
-        self.axiallyExpandAssembly(thermal=False)
+        if CRA:
+            self.axiallyExpandControlAssembly(thermal=False)
+        else:
+            self.axiallyExpandAssembly(thermal=False)
 
     def performThermalAxialExpansion(
         self,
@@ -94,6 +102,7 @@ class AxialExpansionChanger:
         tempField: list,
         setFuel: bool = True,
         updateNDensForRadialExp: bool = True,
+        CRA: bool = False,
     ):
         """Perform thermal expansion for an assembly given an axial temperature grid and field
 
@@ -111,6 +120,8 @@ class AxialExpansionChanger:
         updateNDensForRadialExp: optional, bool
             boolean to determine whether or not the component number densities should be updated
             to account for radial expansion/contraction
+        CRA : boolean, optional
+            boolean to determine whether or not to use the specific control assembly expansion method
 
         Notes
         -----
@@ -124,7 +135,10 @@ class AxialExpansionChanger:
             tempGrid, tempField, updateNDensForRadialExp
         )
         self.expansionData.computeThermalExpansionFactors()
-        self.axiallyExpandAssembly(thermal=True)
+        if CRA:
+            self.axiallyExpandControlAssembly(thermal=True)
+        else:
+            self.axiallyExpandAssembly(thermal=True)
 
     def reset(self):
         self.linked = None
@@ -265,9 +279,10 @@ class AxialExpansionChanger:
         # align upward expanding pin components within control rod bundle.
         # new c.height is set, but c.zbottom and c.ztop need to be set
         for ib, b in enumerate(self.linked.a.getChildrenWithFlags(Flags.CONTROL)):
-            c = _getControlPin(b)
+            c = _getComponent(b, Flags.CONTROL)
             if ib == 0:
-                c.zbottom = b.p.zbottom
+                cladComp = _getComponent(b, Flags.CLAD)
+                c.zbottom = cladComp.zbottom
             else:
                 c.zbottom = self.linked.linkedComponents[c][0].ztop
             c.ztop = c.zbottom + c.height
@@ -284,8 +299,14 @@ class AxialExpansionChanger:
                             "      Component {0} is target component".format(c)
                         )
                         b.p.ztop = c.ztop
+                        if b.hasFlags(Flags.CONTROL) and self.linked.linkedBlocks[b][
+                            0
+                        ].hasFlags(Flags.DUCT):
+                            self.linked.linkedBlocks[b][0].p.ztop = c.zbottom
+                            b.p.zbottom = c.zbottom
                         break
 
+        for b in self.linked.a:
             # see also b.setHeight()
             # - the above not chosen due to call to calculateZCoords
             oldComponentVolumes = [c.getVolume() for c in b]
@@ -452,17 +473,17 @@ class AxialExpansionChanger:
                     c.setNumberDensity(key, c.getNumberDensity(key) / growth)
 
 
-def _getControlPin(b):
+def _getComponent(b, componentFlag):
     """return control pin in control block"""
-    controlComps = b.getChildrenWithFlags(Flags.CONTROL)
-    if len(controlComps) > 1:
+    comps = b.getChildrenWithFlags(componentFlag)
+    if len(comps) > 1:
         raise RuntimeError(
             f"Block {b} has multiple control pin components! "
             "The axial expansion changer is currently only set up to manage one "
             "control pin component per control block."
             "Returned Components = {controlComps}"
         )
-    return controlComps[0]
+    return comps[0]
 
 def _getSolidComponents(b):
     """
