@@ -268,7 +268,30 @@ class TestControlAssemblyExpansion(unittest.TestCase):
         self.a = buildTestAssemblyWithFakeMaterial(control=True)
 
     def test_prescribedAxialExpansion(self):
-        self.axExpChngr.setAssembly(self.a)
+        correctPostExpansionBlockHeights = [11.0, 7.6, 11.0, 10.4, 12.5, 7.5]
+        componentList = []
+        percentList = []
+        for b in self.a:
+            for c in b:
+                componentList.append(c)
+                if c.hasFlags(Flags.DUCT):
+                    percentList.append(0.05)
+                elif c.hasFlags(Flags.CLAD):
+                    percentList.append(0.07)
+                elif c.hasFlags([Flags.SHIELD, Flags.CONTROL]):
+                    percentList.append(0.1)
+                else:
+                    percentList.append(0.0)
+        self.axExpChngr.performPrescribedAxialExpansion(
+            self.a, componentList, percentList, CRA=True
+        )
+        for ib, b in enumerate(self.a):
+            self.assertAlmostEqual(
+                correctPostExpansionBlockHeights[ib],
+                b.getHeight(),
+                msg="Post expansion block height is incorrect for block {0}. \n"
+                "The z-coords are: {1:.4f}, {2:.4f}".format(b, b.p.zbottom, b.p.ztop),
+            )
 
 
 class TestConservation(Base, unittest.TestCase):
@@ -980,8 +1003,12 @@ def buildTestAssemblyWithFakeMaterial(
         assembly.add(_buildTestBlock("plenum", name, hotTemp, height))
     else:
         assembly.add(_buildTestBlock("duct", name, hotTemp, height))
-        assembly.add(_buildTestBlock("control", name, hotTemp, height))
-        assembly.add(_buildTestBlock("plenum", name, hotTemp, height))
+        assembly.add(
+            _buildTestBlock("control", name, hotTemp, height, expandsDownward=True)
+        )
+        assembly.add(
+            _buildTestBlock("plenum", name, hotTemp, height, expandsDownward=True)
+        )
         assembly.add(_buildTestBlock("duct", name, hotTemp, height))
     assembly.add(_buildDummySodium(hotTemp, height))
     assembly.calculateZCoords()
@@ -989,7 +1016,13 @@ def buildTestAssemblyWithFakeMaterial(
     return assembly
 
 
-def _buildTestBlock(blockType: str, name: str, hotTemp: float, height: float):
+def _buildTestBlock(
+    blockType: str,
+    name: str,
+    hotTemp: float,
+    height: float,
+    expandsDownward: bool = False,
+):
     """Return a simple pin type block filled with coolant and surrounded by duct.
 
     Parameters
@@ -1022,6 +1055,9 @@ def _buildTestBlock(blockType: str, name: str, hotTemp: float, height: float):
 
     coolant = DerivedShape("coolant", "Sodium", **coolDims)
     intercoolant = Hexagon("intercoolant", "Sodium", **intercoolantDims)
+
+    if expandsDownward:
+        clad.axiallyExpandsDownwards = True
 
     if blockType != "duct":
         b.add(mainType)
