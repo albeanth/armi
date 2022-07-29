@@ -242,7 +242,7 @@ class AxialExpansionChanger:
                 c.zbottom = c.ztop - c.height
 
         # align upward expanding pin components within control rod bundle.
-        # new c.height is set, but c.zbottom and c.ztop need to be set
+        # new c.height has been updated, but c.zbottom and c.ztop need to be set
         for ib, b in enumerate(self.linked.a.getChildrenWithFlags(Flags.CONTROL)):
             c = _getComponent(b, Flags.CONTROL)
             if ib == 0:
@@ -252,24 +252,23 @@ class AxialExpansionChanger:
                 c.zbottom = self.linked.linkedComponents[c][0].ztop
             c.ztop = c.zbottom + c.height
 
-        # redistribute block bounds if on the target component
+        # redistribute block bounds based on the target component
+        adjustedLowestControlDuct = False
         for ib, b in enumerate(self.linked.a):
-            # if ib == 0, leave block bottom = 0.0
+            c = self.expansionData.getTargetComponent(b)
+            runLog.debug("      Component {0} is target component".format(c))
             if ib > 0:
-                b.p.zbottom = self.linked.linkedBlocks[b][0].p.ztop
-            if ib < len(self.linked.a) - 1:
-                for c in b:
-                    if self.expansionData.isTargetComponent(c):
-                        runLog.debug(
-                            "      Component {0} is target component".format(c)
-                        )
-                        b.p.ztop = c.ztop
-                        if b.hasFlags(Flags.CONTROL) and self.linked.linkedBlocks[b][
-                            0
-                        ].hasFlags(Flags.DUCT):
-                            self.linked.linkedBlocks[b][0].p.ztop = c.zbottom
-                            b.p.zbottom = c.zbottom
-                        break
+                if self.linked.linkedBlocks[b][0].p.ztop != c.zbottom:
+                    self.linked.linkedBlocks[b][0].p.ztop = c.zbottom
+                b.p.zbottom = c.zbottom
+            if ib == len(self.linked.a) - 1:
+                continue
+            if b.hasFlags(Flags.DUCT) and not adjustedLowestControlDuct:
+                cTmp = self.expansionData.getTargetComponent(self.linked.a[ib + 1])
+                b.p.ztop = cTmp.zbottom
+                adjustedLowestControlDuct = True
+            else:
+                b.p.ztop = c.ztop
 
         for b in self.linked.a:
             # see also b.setHeight()
@@ -887,3 +886,9 @@ class ExpansionData:
             :py:class:`Component <armi.reactor.components.component.Component>` object to check target component status
         """
         return bool(c in self._componentDeterminesBlockHeight)
+
+    def getTargetComponent(self, b):
+        for c in b:
+            if self.isTargetComponent(c):
+                return c
+        raise RuntimeError(f"No target component found for block {b}!")
