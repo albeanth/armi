@@ -257,13 +257,22 @@ class AxialExpansionChanger:
         for ib, b in enumerate(self.linked.a):
             c = self.expansionData.getTargetComponent(b)
             runLog.debug("      Component {0} is target component".format(c))
-            if ib > 0:
-                if self.linked.linkedBlocks[b][0].p.ztop != c.zbottom:
-                    self.linked.linkedBlocks[b][0].p.ztop = c.zbottom
+            if 0 < ib < numOfBlocks - 1:
                 b.p.zbottom = c.zbottom
-            if ib == len(self.linked.a) - 1:
-                continue
-            if b.hasFlags(Flags.DUCT) and not adjustedLowestControlDuct:
+                # correct potentially misaligned blocks
+                if (
+                    self.linked.linkedBlocks[b][0].p.ztop != c.zbottom
+                    and ib < numOfBlocks - 1
+                ):
+                    if self.linked.linkedBlocks[b][0].hasFlags(
+                        TARGET_FLAGS_IN_PREFERRED_ORDER
+                    ):
+                        c.zbottom = self.linked.linkedBlocks[b][0].p.ztop
+                    else:
+                        self.linked.linkedBlocks[b][0].p.ztop = c.zbottom
+            if ib == numOfBlocks - 1:
+                b.p.zbottom = self.linked.linkedBlocks[b][0].p.ztop
+            elif b.hasFlags(Flags.DUCT) and not adjustedLowestControlDuct:
                 cTmp = self.expansionData.getTargetComponent(self.linked.a[ib + 1])
                 b.p.ztop = cTmp.zbottom
                 adjustedLowestControlDuct = True
