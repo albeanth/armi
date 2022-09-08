@@ -39,7 +39,7 @@ from armi.reactor.converters.axialExpansionChanger import (
 from armi.reactor.flags import Flags
 from armi import materials
 from armi.utils import units
-from armi.materials import custom
+from armi.materials import custom, void, sodium
 from armi.tests import mockRunLogs
 
 # set namespace order for materials so that fake HT9 material can be found
@@ -540,31 +540,32 @@ class TestConservation(Base, unittest.TestCase):
 
     def test_computeThermalExpansionFactors(self):
         """ensure expansion factors are as expected"""
+        materialsToSkip = (void.Void, sodium.Sodium)
         self.obj.setAssembly(self.a)
         stdThermExpFactor = {}
         newTemp = 500.0
         # apply new temp to the pin and clad components of each block
         for b in self.a:
-            for c in b[0:2]:
-                stdThermExpFactor[c] = c.getThermalExpansionFactor() - 1.0
-                self.obj.expansionData.updateComponentTemp(b, c, newTemp)
+            for c in b:
+                if not isinstance(c.material, materialsToSkip):
+                    stdThermExpFactor[c] = c.getThermalExpansionFactor() - 1.0
+                    self.obj.expansionData.updateComponentTemp(b, c, newTemp)
 
         self.obj.expansionData.computeThermalExpansionFactors()
 
-        # skip dummy block, it's just coolant and doesn't expand.
-        for b in self.a[:-1]:
-            for ic, c in enumerate(b):
-                if ic <= 1:
+        for b in self.a:
+            for c in b:
+                if not isinstance(c.material, materialsToSkip):
                     self.assertNotEqual(
                         stdThermExpFactor[c],
                         self.obj.expansionData.getExpansionFactor(c),
-                        msg=f"Block {b}, Component {c}, thermExpCoeff not right.\n",
+                        msg=f"Block {b}, Component {c}, thermExpCoeff should be non-zero! It is {self.obj.expansionData.getExpansionFactor(c)}.\n",
                     )
                 else:
                     self.assertEqual(
                         self.obj.expansionData.getExpansionFactor(c),
                         0.0,
-                        msg=f"Block {b}, Component {c}, thermExpCoeff not right.\n",
+                        msg=f"Block {b}, Component {c}, thermExpCoeff should be 0.0! It is {self.obj.expansionData.getExpansionFactor(c)}.\n",
                     )
 
 

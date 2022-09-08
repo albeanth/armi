@@ -217,17 +217,17 @@ class AxialExpansionChanger:
             # if ib == 0, leave block bottom = 0.0
             if ib > 0:
                 b.p.zbottom = self.linked.linkedBlocks[b][0].p.ztop
-            # if not in the dummy block, get expansion factor, do alignment, and modify block
-            if ib < (numOfBlocks - 1):
+            isDummyBlock = ib == (numOfBlocks - 1)
+            if not isDummyBlock:
                 ## grow all the components
-                for c in b:
+                for c in _getSolidComponents(b):
                     growFrac = self.expansionData.getExpansionFactor(c)
                     runLog.debug(
                         msg="      Component {0}, growFrac = {1:.4e}".format(
                             c, growFrac
                         )
                     )
-                    if thermal and self.expansionData.componentReferenceHeight:
+                    if thermal and c in self.expansionData.componentReferenceHeight:
                         blockHeight = self.expansionData.componentReferenceHeight[c]
                     if growFrac >= 0.0:
                         c.height = (1.0 + growFrac) * blockHeight
@@ -299,12 +299,7 @@ class AxialExpansionChanger:
                     self.linked.linkedBlocks[b][0].p.ztop != c.zbottom
                     and ib < numOfBlocks - 1
                 ):
-                    if self.linked.linkedBlocks[b][0].hasFlags(
-                        TARGET_FLAGS_IN_PREFERRED_ORDER
-                    ):
-                        c.zbottom = self.linked.linkedBlocks[b][0].p.ztop
-                    else:
-                        self.linked.linkedBlocks[b][0].p.ztop = c.zbottom
+                    b.p.zbottom = self.linked.linkedBlocks[b][0].p.ztop
             if ib == numOfBlocks - 1:
                 b.p.zbottom = self.linked.linkedBlocks[b][0].p.ztop
             elif b.hasFlags(Flags.DUCT) and not adjustedLowestControlDuct:
@@ -492,6 +487,7 @@ def _getComponent(b, componentFlag):
             "Returned Components = {controlComps}"
         )
     return comps[0]
+
 
 def _getSolidComponents(b):
     """
