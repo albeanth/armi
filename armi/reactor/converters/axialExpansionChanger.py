@@ -266,10 +266,14 @@ class AxialExpansionChanger:
                 if ib == len(blockList) - 1:
                     c.ztop = topAnchorForDownwardExpansion
                 else:
-                    # use linked components above.
-                    # if KeyError gets thrown, add else: to cover no linked
-                    # components and use the bottom of the block above.
-                    c.ztop = self.linked.linkedComponents[c][1].zbottom
+                    if self.linked.linkedComponents[c][1] is not None:
+                        # use linked components above
+                        c.ztop = self.linked.linkedComponents[c][1].zbottom
+                    else:
+                        # otherwise there aren't any linked components
+                        # so just set the top of the component to
+                        # the bottom of the block above it
+                        c.ztop = self.linked.linkedBlocks[b][1].p.zbottom
                 c.zbottom = c.ztop - c.height
 
         # align upward expanding pin components within control rod bundle.
@@ -949,7 +953,11 @@ class ExpansionData:
         else:
             componentWFlag = [c for c in b.getChildren() if c.hasFlags(flagOfInterest)]
         if len(componentWFlag) == 0:
-            raise RuntimeError("No target component found!\n   Block {0}".format(b))
+            raise RuntimeError(
+                "No target component found!\n   Block {0}\n   Assembly {1}".format(
+                    b, b.parent
+                )
+            )
         if len(componentWFlag) > 1:
             raise RuntimeError(
                 "Cannot have more than one component within a block that has the target flag!"
