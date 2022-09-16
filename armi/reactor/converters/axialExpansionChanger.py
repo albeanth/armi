@@ -477,14 +477,18 @@ class AxialExpansionChanger:
 
 
 def _getComponent(b, componentFlag):
-    """return control pin in control block"""
+    """return component (with componentFlag) in block, b"""
     comps = b.getChildrenWithFlags(componentFlag)
     if len(comps) > 1:
         raise RuntimeError(
-            f"Block {b} has multiple control pin components! "
-            "The axial expansion changer is currently only set up to manage one "
-            "control pin component per control block."
-            "Returned Components = {controlComps}"
+            f"Block {b} has multiple components with flag {componentFlag}"
+            "_getComponent can only process blocks who have 1 component that"
+            "match componentFlag."
+            "Returned Components = {comps}"
+        )
+    if len(comps) == 0:
+        raise RuntimeError(
+            f"Block {b} has no components matching the flag {componentFlag}!"
         )
     return comps[0]
 
@@ -997,6 +1001,18 @@ class ExpansionData:
         return bool(c in self._componentDeterminesBlockHeight)
 
     def getTargetComponent(self, b):
+        """return the target component for a block
+
+        Parameters
+        ----------
+        b : :py:class:`Block <armi.reactor.blocks.Block>` object
+            block to retrieve target component
+
+        Raises
+        ------
+        RuntimeError
+            no target component found
+        """
         for c in b:
             if self.isTargetComponent(c):
                 return c
