@@ -266,14 +266,10 @@ class AxialExpansionChanger:
                 if ib == len(blockList) - 1:
                     c.ztop = topAnchorForDownwardExpansion
                 else:
-                    if self.linked.linkedComponents[c][1] is not None:
-                        # use linked components above
-                        c.ztop = self.linked.linkedComponents[c][1].zbottom
-                    else:
-                        # otherwise there aren't any linked components
-                        # so just set the top of the component to
-                        # the bottom of the block above it
-                        c.ztop = self.linked.linkedBlocks[b][1].p.zbottom
+                    # use linked components above.
+                    # if KeyError gets thrown, add else: to cover no linked
+                    # components and use the bottom of the block above.
+                    c.ztop = self.linked.linkedComponents[c][1].zbottom
                 c.zbottom = c.ztop - c.height
 
         # align upward expanding pin components within control rod bundle.
