@@ -27,15 +27,15 @@ plant-wide state variables such as keff, cycle, and node.
    The Reactor contains a Core, which contains a heirachical collection of Assemblies, which in turn
    each contain a collection of Blocks.
 """
-from typing import Optional
 import collections
 import copy
 import itertools
 import os
-import tabulate
 import time
+from typing import Optional
 
 import numpy
+import tabulate
 
 from armi import runLog
 from armi import getPluginManagerOrFail, materials, nuclearDataIO, settings
@@ -1875,7 +1875,6 @@ class Core(composites.Composite):
                 ]
             )
         )
-
         self.p.axialMesh = list(numpy.append([0.0], avgHeight.cumsum()))
 
     def findAxialMeshIndexOf(self, heightCm):
@@ -2252,7 +2251,6 @@ class Core(composites.Composite):
                 "Please make sure that this is intended and not a input error."
             )
 
-        nonUniformAssems = [Flags.fromString(t) for t in cs["nonUniformAssemFlags"]]
         if dbLoad:
             # reactor.blueprints.assemblies need to be populated
             # this normally happens during armi/reactor/blueprints/__init__.py::constructAssem
@@ -2270,8 +2268,6 @@ class Core(composites.Composite):
                     reverse=True,
                 )[0]
                 for a in self.parent.blueprints.assemblies.values():
-                    if a.hasFlags(nonUniformAssems, exact=True):
-                        continue
                     a.makeAxialSnapList(refAssem=finestMeshAssembly)
             if not cs["inputHeightsConsideredHot"]:
                 runLog.header(
@@ -2287,8 +2283,6 @@ class Core(composites.Composite):
             if not cs["detailedAxialExpansion"]:
                 # prepare core for mesh snapping during axial expansion
                 for a in self.getAssemblies(includeAll=True):
-                    if a.hasFlags(nonUniformAssems, exact=True):
-                        continue
                     a.makeAxialSnapList(self.refAssem)
             if not cs["inputHeightsConsideredHot"]:
                 runLog.header(
@@ -2318,7 +2312,9 @@ class Core(composites.Composite):
 
         self.p.maxAssemNum = self.getMaxParam("assemNum")
 
-        getPluginManagerOrFail().hook.onProcessCoreLoading(core=self, cs=cs)
+        getPluginManagerOrFail().hook.onProcessCoreLoading(
+            core=self, cs=cs, dbLoad=dbLoad
+        )
 
     def _applyThermalExpansion(
         self, assems: list, dbLoad: bool, referenceAssembly=None
@@ -2359,3 +2355,4 @@ class Core(composites.Composite):
         for a in assems:
             for b in a:
                 b.p.heightBOL = b.getHeight()
+                b.completeInitialLoading()
