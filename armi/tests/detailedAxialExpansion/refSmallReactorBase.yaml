@@ -339,7 +339,7 @@ blocks:
     
     ## ------------------------------------------------------------------------------------
     ## control
-    duct: &block_control_duct
+    expandable duct: &block_control_duct
         coolant: *component_coolant
         duct: *component_fuel_duct
         intercoolant: *component_fuel_intercoolant

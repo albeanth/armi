@@ -253,8 +253,13 @@ class AxialExpansionChanger:
                         else:
                             # otherwise there aren't any linked components
                             # so just set the bottom of the component to
-                            # the top of the block below it
-                            c.zbottom = self.linked.linkedBlocks[b][0].p.ztop
+                            # the top of the target component in the block below it
+                            targetCompForBlockBelow = (
+                                self.expansionData.getTargetComponent(
+                                    self.linked.linkedBlocks[b][0]
+                                )
+                            )
+                            c.zbottom = targetCompForBlockBelow.ztop
                     c.ztop = c.zbottom + c.height
 
         # align downward expanding components
@@ -272,8 +277,11 @@ class AxialExpansionChanger:
                     else:
                         # otherwise there aren't any linked components
                         # so just set the top of the component to
-                        # the bottom of the block above it
-                        c.ztop = self.linked.linkedBlocks[b][1].p.zbottom
+                        # the bottom of target component in the block above it
+                        targetCompForBlockAbove = self.expansionData.getTargetComponent(
+                            self.linked.linkedBlocks[b][1]
+                        )
+                        c.ztop = targetCompForBlockAbove.zbottom
                 c.zbottom = c.ztop - c.height
 
         # align upward expanding pin components within control rod bundle.
@@ -302,7 +310,7 @@ class AxialExpansionChanger:
                     b.p.zbottom = self.linked.linkedBlocks[b][0].p.ztop
             if ib == numOfBlocks - 1:
                 b.p.zbottom = self.linked.linkedBlocks[b][0].p.ztop
-            elif b.hasFlags(Flags.DUCT) and not adjustedLowestControlDuct:
+            elif b.hasFlags(Flags.EXPANDABLE) and not adjustedLowestControlDuct:
                 cTmp = self.expansionData.getTargetComponent(self.linked.a[ib + 1])
                 b.p.ztop = cTmp.zbottom
                 adjustedLowestControlDuct = True

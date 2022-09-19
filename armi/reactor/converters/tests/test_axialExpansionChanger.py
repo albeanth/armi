@@ -1203,6 +1203,7 @@ def _buildTestBlock(
         determines which fake material to use
     """
     b = HexBlock(blockType, height=height)
+    b.setType(blockType)
 
     pinDims = {"Tinput": 25.0, "Thot": hotTemp, "od": 0.76, "id": 0.00, "mult": 127.0}
     cladDims = {"Tinput": 25.0, "Thot": hotTemp, "od": 0.80, "id": 0.77, "mult": 127.0}
@@ -1231,10 +1232,11 @@ def _buildTestBlock(
     if blockType != "duct":
         b.add(mainType)
         b.add(clad)
+    else:
+        b.setType(typ="expandable duct")
     b.add(duct)
     b.add(coolant)
     b.add(intercoolant)
-    b.setType(blockType)
 
     b.getVolumeFractions()
 
