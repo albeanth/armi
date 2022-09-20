@@ -2271,7 +2271,7 @@ class Core(composites.Composite):
                     a.makeAxialSnapList(refAssem=finestMeshAssembly)
             if not cs["inputHeightsConsideredHot"]:
                 runLog.header(
-                    "=========== Axially expanding blueprints assemblies (except control) from Tinput to Thot ==========="
+                    "=========== Axially expanding blueprints assemblies from Tinput to Thot ==========="
                 )
                 self._applyThermalExpansion(
                     self.parent.blueprints.assemblies.values(),
