@@ -605,7 +605,7 @@ class TestManageCoreMesh(unittest.TestCase):
         )
 
     def test_manageCoreMesh(self):
-        self.axialExpChngr.manageCoreMesh(self.r)
+        self.axialExpChngr.manageCoreMesh(self.r, nonUniformAssems=[])
         newAxialMesh = self.r.core.p.axialMesh
         # skip first and last entries as they do not change
         for old, new in zip(self.oldAxialMesh[1:-1], newAxialMesh[1:-1]):
