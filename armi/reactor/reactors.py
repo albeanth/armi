@@ -2274,9 +2274,10 @@ class Core(composites.Composite):
                     "=========== Axially expanding blueprints assemblies from Tinput to Thot ==========="
                 )
                 self._applyThermalExpansion(
-                    self.parent.blueprints.assemblies.values(),
-                    dbLoad,
-                    finestMeshAssembly,
+                    assems=self.parent.blueprints.assemblies.values(),
+                    dbLoad=dbLoad,
+                    nonUniformAssems=cs["nonUniformAssemFlags"],
+                    referenceAssembly=finestMeshAssembly,
                 )
 
         else:
@@ -2288,7 +2289,11 @@ class Core(composites.Composite):
                 runLog.header(
                     "=========== Axially expanding all assemblies from Tinput to Thot ==========="
                 )
-                self._applyThermalExpansion(self.getAssemblies(includeAll=True), dbLoad)
+                self._applyThermalExpansion(
+                    assems=self.getAssemblies(includeAll=True),
+                    dbLoad=dbLoad,
+                    nonUniformAssems=cs["nonUniformAssemFlags"],
+                )
 
             self.p.referenceBlockAxialMesh = self.findAllAxialMeshPoints(
                 applySubMesh=False
@@ -2317,7 +2322,7 @@ class Core(composites.Composite):
         )
 
     def _applyThermalExpansion(
-        self, assems: list, dbLoad: bool, referenceAssembly=None
+        self, assems: list, dbLoad: bool, nonUniformAssems: list, referenceAssembly=None
     ):
         """expand assemblies, resolve disjoint axial mesh (if needed), and update block BOL heights
 
@@ -2327,6 +2332,9 @@ class Core(composites.Composite):
             list of :py:class:`Assembly <armi.reactor.assemblies.Assembly>` objects to be thermally expanded
         dbLoad: bool
             boolean to determine if Core::processLoading is loading a database or constructing a Core
+        nonUniformAssems: list, str
+            a list of assemblies who are considered non-uniform assemblies and to be resolved
+            with the uniform mesh converter
         referenceAssembly: optional, :py:class:`Assembly <armi.reactor.assemblies.Assembly>`
             is the thermally expanded assembly whose axial mesh is used to snap the
             blueprints assemblies axial mesh to
@@ -2342,10 +2350,14 @@ class Core(composites.Composite):
                 axialExpChngr.axiallyExpandAssembly(thermal=True)
         # resolve axially disjoint mesh (if needed)
         if not dbLoad:
-            axialExpChngr.manageCoreMesh(self.parent)
+            axialExpChngr.manageCoreMesh(self.parent, nonUniformAssems)
         elif not self._detailedAxialExpansion:
+            flagsForNonUniformAssems = [
+                Flags.fromStringIgnoreErrors(f) for f in nonUniformAssems
+            ]
             for a in assems:
-                a.setBlockMesh(referenceAssembly.getAxialMesh())
+                if not a.hasFlags(flagsForNonUniformAssems):
+                    a.setBlockMesh(referenceAssembly.getAxialMesh())
         # update block BOL heights to reflect hot heights
         for a in assems:
             for b in a:

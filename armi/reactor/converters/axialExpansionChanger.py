@@ -429,7 +429,7 @@ class AxialExpansionChanger:
         bounds[2] = array(mesh)
         self.linked.a.spatialGrid._bounds = tuple(bounds)
 
-    def manageCoreMesh(self, r):
+    def manageCoreMesh(self, r, nonUniformAssems: list):
         """
         manage core mesh post assembly-level expansion
 
@@ -437,7 +437,9 @@ class AxialExpansionChanger:
         ----------
         r : :py:class:`Reactor <armi.reactor.reactors.Reactor>` object.
             ARMI reactor to have mesh modified
-
+        nonUniformAssems: list, str
+            a list of assemblies who are considered non-uniform assemblies and to be resolved
+            with the uniform mesh converter
         Notes
         -----
         - if no detailedAxialExpansion, then do "cheap" approach to uniformMesh converter.
@@ -445,10 +447,14 @@ class AxialExpansionChanger:
         - oldMesh will be None during initial core construction at processLoading as it has not yet
           been set.
         """
+        flagsForNonUniformAssems = [
+            Flags.fromStringIgnoreErrors(f) for f in nonUniformAssems
+        ]
         if not self._detailedAxialExpansion:
             # loop through again now that the reference is adjusted and adjust the non-fuel assemblies.
             for a in r.core.getAssemblies():
-                a.setBlockMesh(r.core.refAssem.getAxialMesh())
+                if not a.hasFlags(flagsForNonUniformAssems):
+                    a.setBlockMesh(r.core.refAssem.getAxialMesh())
 
         oldMesh = r.core.p.axialMesh
         r.core.updateAxialMesh()
