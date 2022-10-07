@@ -969,6 +969,18 @@ def checkColdBlockHeight(bStd, bExp, assertType, strForAssertion):
             strForAssertion,
         ),
     )
+    assertType(
+        bStd.p.heightBOL,
+        bExp.p.heightBOL,
+        msg="Assembly: {0} -- Std Block {1} ({2}) and Exp Block {3} ({4}) should have {5:s} BOL heights!".format(
+            bStd.parent,
+            bStd,
+            bStd.p.heightBOL,
+            bExp,
+            bExp.p.heightBOL,
+            strForAssertion,
+        ),
+    )
 
 
 class TestLinkage(unittest.TestCase):

@@ -852,8 +852,8 @@ class HexReactorTests(ReactorTests):
 
         Notes:
         ------
-        - all assertions skip the first block as it has no $\Delta T$ and does not expand
         - to maintain code coverage, _applyThermalExpansion is called via processLoading
+        - heights are checked in test_axialExpansionChanger.py
         """
         self.o.cs["inputHeightsConsideredHot"] = False
         assemsToChange = self.r.core.getAssemblies()
@@ -861,14 +861,14 @@ class HexReactorTests(ReactorTests):
         oldRefBlockAxialMesh = self.r.core.p.referenceBlockAxialMesh
         oldAxialMesh = self.r.core.p.axialMesh
 
-        nonEqualParameters = ["heightBOL", "molesHmBOL", "massHmBOL"]
+        nonEqualParameters = ["molesHmBOL", "massHmBOL"]
         equalParameters = ["smearDensity", "nHMAtBOL", "enrichmentBOL"]
 
         oldBlockParameters = {}
         for param in nonEqualParameters + equalParameters:
             oldBlockParameters[param] = {}
             for a in assemsToChange:
-                for b in a[1:]:
+                for b in a:
                     oldBlockParameters[param][b] = b.p[param]
 
         self.r.core.processLoading(self.o.cs, dbLoad=False)
@@ -878,56 +878,63 @@ class HexReactorTests(ReactorTests):
             self.assertNotEqual(val, self.r.core.p.axialMesh[i])
 
         for a in assemsToChange:
-            if not a.hasFlags(Flags.CONTROL):
-                for b in a[1:]:
-                    for param in nonEqualParameters:
-                        if oldBlockParameters[param][b] and b.p[param]:
-                            self.assertNotEqual(
-                                oldBlockParameters[param][b], b.p[param]
-                            )
-                        else:
-                            self.assertAlmostEqual(
-                                oldBlockParameters[param][b], b.p[param]
-                            )
-                    for param in equalParameters:
+            for b in a:
+                for param in nonEqualParameters:
+                    if oldBlockParameters[param][b] and b.p[param]:
+                        self.assertNotEqual(oldBlockParameters[param][b], b.p[param])
+                    else:
                         self.assertAlmostEqual(oldBlockParameters[param][b], b.p[param])
+                for param in equalParameters:
+                    self.assertAlmostEqual(oldBlockParameters[param][b], b.p[param])
 
-    def test_updateBlockBOLHeights_DBLoad(self):
+    def test_applyThermalExpansion_DBLoad(self):
         """test Core::_applyThermalExpansion for db load
 
         Notes:
         ------
-        - all assertions skip the first block as it has no $\Delta T$ and does not expand
         - to maintain code coverage, _applyThermalExpansion is called via processLoading
+        - skip middle fuel assem as it has custom material which will cause nonEqualParameters to fail
+        - heights are checked in test_axialExpansionChanger.py
         """
         self.o.cs["inputHeightsConsideredHot"] = False
-        assemsToChange = [a for a in self.r.blueprints.assemblies.values()]
+        assemsToChange = [
+            a
+            for a in self.r.blueprints.assemblies.values()
+            if not a.hasFlags(Flags.MIDDLE | Flags.FUEL)
+        ]
         # stash original blueprint assemblies axial mesh info
-        nonEqualParameters = ["heightBOL", "molesHmBOL", "massHmBOL"]
+        nonEqualParameters = ["molesHmBOL", "massHmBOL"]
         equalParameters = ["smearDensity", "nHMAtBOL", "enrichmentBOL"]
         oldBlockParameters = {}
         for param in nonEqualParameters + equalParameters:
             oldBlockParameters[param] = {}
             for a in assemsToChange:
-                for b in a[1:]:
+                for b in a:
                     oldBlockParameters[param][b] = b.p[param]
 
         self.r.core.processLoading(self.o.cs, dbLoad=True)
 
         for a in assemsToChange:
-            if not a.hasFlags(Flags.CONTROL):
-                for b in a[1:]:
-                    for param in nonEqualParameters:
-                        if oldBlockParameters[param][b] and b.p[param]:
-                            self.assertNotEqual(
-                                oldBlockParameters[param][b], b.p[param]
-                            )
-                        else:
-                            self.assertAlmostEqual(
-                                oldBlockParameters[param][b], b.p[param]
-                            )
-                    for param in equalParameters:
-                        self.assertAlmostEqual(oldBlockParameters[param][b], b.p[param])
+            for b in a:
+                for param in nonEqualParameters:
+                    if oldBlockParameters[param][b] and b.p[param]:
+                        self.assertNotEqual(
+                            oldBlockParameters[param][b],
+                            b.p[param],
+                            msg=f"Failure on {param} for block {b} in {a}.",
+                        )
+                    else:
+                        self.assertAlmostEqual(
+                            oldBlockParameters[param][b],
+                            b.p[param],
+                            msg=f"Failure on {param} for block {b} in {a}.",
+                        )
+                for param in equalParameters:
+                    self.assertAlmostEqual(
+                        oldBlockParameters[param][b],
+                        b.p[param],
+                        msg=f"Failure on {param} for block {b} in {a}.",
+                    )
 
 
 class CartesianReactorTests(ReactorTests):
