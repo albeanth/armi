@@ -14,6 +14,8 @@
 
 r"""Tests materials.py"""
 # pylint: disable=missing-function-docstring,missing-class-docstring,abstract-method,protected-access,no-member,invalid-name
+
+import math
 import pickle
 import unittest
 
@@ -42,6 +44,41 @@ class _Material_Test:
         self.assertEqual(
             self.mat.thermalConductivity(500), mat.thermalConductivity(500)
         )
+
+    def test_density3(self):
+        """Test that all materials produce a zero density from density3"""
+        self.assertNotEqual(self.mat.density3(500), 0)
+
+    def test_TD(self):
+        self.assertEqual(self.mat.getTD(), self.mat.theoreticalDensityFrac)
+
+        self.mat.clearCache()
+        self.mat._setCache("dummy", 666)
+        self.assertEqual(self.mat.cached, {"dummy": 666})
+        self.mat.adjustTD(0.5)
+        self.assertEqual(0.5, self.mat.theoreticalDensityFrac)
+        self.assertEqual(self.mat.cached, {})
+
+    def test_duplicate(self):
+        mat = self.mat.duplicate()
+
+        self.assertEqual(len(mat.massFrac), len(self.mat.massFrac))
+        for key in self.mat.massFrac:
+            self.assertEqual(mat.massFrac[key], self.mat.massFrac[key])
+
+        self.assertEqual(mat.parent, self.mat.parent)
+        self.assertEqual(mat.refDens, self.mat.refDens)
+        self.assertEqual(mat.theoreticalDensityFrac, self.mat.theoreticalDensityFrac)
+
+    def test_cache(self):
+        self.mat.clearCache()
+        self.assertEqual(len(self.mat.cached), 0)
+
+        self.mat._setCache("Emmy", "Noether")
+        self.assertEqual(len(self.mat.cached), 1)
+
+        val = self.mat._getCached("Emmy")
+        self.assertEqual(val, "Noether")
 
 
 class MaterialConstructionTests(unittest.TestCase):
@@ -84,19 +121,25 @@ class MaterialFindingTests(unittest.TestCase):
 
 
 class Californium_TestCase(_Material_Test, unittest.TestCase):
+
     MAT_CLASS = materials.Californium
 
     def test_density(self):
         ref = 15.1
 
         cur = self.mat.density(923)
-        self.assertAlmostEqual(cur, ref, delta=ref * 0.05)
+        self.assertEqual(cur, ref)
 
         cur = self.mat.density(1390)
-        self.assertAlmostEqual(cur, ref, delta=ref * 0.05)
+        self.assertEqual(cur, ref)
 
     def test_propertyValidTemperature(self):
         self.assertEqual(len(self.mat.propertyValidTemperature), 0)
+
+    def test_porosities(self):
+        self.mat.parent = None
+        self.assertEqual(self.mat.liquidPorosity, 0.0)
+        self.assertEqual(self.mat.gasPorosity, 0.0)
 
 
 class Cesium_TestCase(_Material_Test, unittest.TestCase):
@@ -120,13 +163,13 @@ class Magnesium_TestCase(_Material_Test, unittest.TestCase):
 
     def test_density(self):
         cur = self.mat.density(923)
-        ref = 1.59
-        delta = ref * 0.05
+        ref = 1.5897
+        delta = ref * 0.0001
         self.assertAlmostEqual(cur, ref, delta=delta)
 
         cur = self.mat.density(1390)
-        ref = 1.466
-        delta = ref * 0.05
+        ref = 1.4661
+        delta = ref * 0.0001
         self.assertAlmostEqual(cur, ref, delta=delta)
 
     def test_propertyValidTemperature(self):
@@ -182,7 +225,7 @@ class MOX_TestCase(_Material_Test, unittest.TestCase):
     MAT_CLASS = materials.MOX
 
     def test_density(self):
-        cur = self.mat.density(333)
+        cur = self.mat.density3(333)
         ref = 10.926
         delta = ref * 0.0001
         self.assertAlmostEqual(cur, ref, delta=delta)
@@ -199,16 +242,46 @@ class MOX_TestCase(_Material_Test, unittest.TestCase):
         ref = 2996.788765
         self.assertAlmostEqual(self.mat.meltingPoint(), ref, delta=ref * 0.001)
 
+    def test_applyInputParams(self):
+        massFracNameList = [
+            "AM241",
+            "O16",
+            "PU238",
+            "PU239",
+            "PU240",
+            "PU241",
+            "PU242",
+            "U235",
+            "U238",
+        ]
+        massFracRefValList = [
+            0.000998,
+            0.118643,
+            0.000156,
+            0.119839,
+            0.029999,
+            0.00415,
+            0.000858,
+            0.166759,
+            0.558597,
+        ]
+
+        self.mat.applyInputParams()
+
+        for name, frac in zip(massFracNameList, massFracRefValList):
+            cur = self.mat.massFrac[name]
+            self.assertEqual(cur, frac)
+
 
 class NaCl_TestCase(_Material_Test, unittest.TestCase):
     MAT_CLASS = materials.NaCl
 
     def test_density(self):
-        cur = self.mat.density(Tc=100)
+        cur = self.mat.density3(Tc=100)
         ref = 2.113204
         self.assertAlmostEqual(cur, ref, delta=abs(ref * 0.001))
 
-        cur = self.mat.density(Tc=300)
+        cur = self.mat.density3(Tc=300)
         ref = 2.050604
         self.assertAlmostEqual(cur, ref, delta=abs(ref * 0.001))
 
@@ -236,18 +309,28 @@ class Potassium_TestCase(_Material_Test, unittest.TestCase):
     MAT_CLASS = materials.Potassium
 
     def test_density(self):
-        cur = self.mat.density(Tk=333)
-        ref = 0.828
+        cur = self.mat.density(Tc=100)
+        ref = 0.8195
         delta = ref * 0.001
         self.assertAlmostEqual(cur, ref, delta=delta)
 
-        cur = self.mat.density(Tk=500)
-        ref = 0.7909
+        cur = self.mat.density(Tc=333)
+        ref = 0.7664
         delta = ref * 0.001
         self.assertAlmostEqual(cur, ref, delta=delta)
 
-        cur = self.mat.density(Tk=750)
-        ref = 0.732
+        cur = self.mat.density(Tc=500)
+        ref = 0.7267
+        delta = ref * 0.001
+        self.assertAlmostEqual(cur, ref, delta=delta)
+
+        cur = self.mat.density(Tc=750)
+        ref = 0.6654
+        delta = ref * 0.001
+        self.assertAlmostEqual(cur, ref, delta=delta)
+
+        cur = self.mat.density(Tc=1200)
+        ref = 0.5502
         delta = ref * 0.001
         self.assertAlmostEqual(cur, ref, delta=delta)
 
@@ -259,11 +342,7 @@ class ScandiumOxide_TestCase(_Material_Test, unittest.TestCase):
     MAT_CLASS = materials.Sc2O3
 
     def test_density(self):
-        cur = self.mat.density(Tc=100)
-        ref = 3.86
-        self.assertAlmostEqual(cur, ref, delta=abs(ref * 0.001))
-
-        cur = self.mat.density(Tc=400)
+        cur = self.mat.density(Tc=25)
         ref = 3.86
         self.assertAlmostEqual(cur, ref, delta=abs(ref * 0.001))
 
@@ -389,6 +468,12 @@ class ThoriumUraniumMetal_TestCase(_Material_Test, unittest.TestCase):
 class Uranium_TestCase(_Material_Test, unittest.TestCase):
     MAT_CLASS = materials.Uranium
 
+    def test_density3(self):
+        """
+        this material has no density function
+        """
+        pass
+
     def test_thermalConductivity(self):
         cur = self.mat.thermalConductivity(Tc=100)
         ref = 28.489312629207500293659904855
@@ -424,7 +509,7 @@ class UraniumOxide_TestCase(_Material_Test, unittest.TestCase):
         self.mat.adjustMassEnrichment(0.02)
 
         gPerMol = 2 * o16 + 0.02 * u235 + 0.98 * u238
-        massFracs = self.mat.p.massFrac
+        massFracs = self.mat.massFrac
 
         testing.assert_allclose(massFracs["O"], 2 * o16 / gPerMol, rtol=5e-4)
         testing.assert_allclose(
@@ -435,7 +520,7 @@ class UraniumOxide_TestCase(_Material_Test, unittest.TestCase):
         )
 
         self.mat.adjustMassEnrichment(0.2)
-        massFracs = self.mat.p.massFrac
+        massFracs = self.mat.massFrac
         gPerMol = 2 * o16 + 0.8 * u238 + 0.2 * u235
 
         testing.assert_allclose(massFracs["O"], 2 * o16 / gPerMol, rtol=5e-4)
@@ -456,12 +541,12 @@ class UraniumOxide_TestCase(_Material_Test, unittest.TestCase):
         # Fuels Including the Effects of Irradiation.", Popov, et al.  Table 3.2 "Parameters of
         # thermal expansion of stoichiometric MOX fuel and density of UO2 as a function of
         # temperature"
-        cur = self.mat.density(Tk=700)
+        cur = self.mat.density3(Tk=700)
         ref = 1.0832e4 * 0.001  # Convert to grams/cc
         delta = ref * 0.02
         self.assertAlmostEqual(cur, ref, delta=delta)
 
-        cur = self.mat.density(Tk=2600)
+        cur = self.mat.density3(Tk=2600)
         ref = 9.9698e3 * 0.001  # Convert to grams/cc
         delta = ref * 0.02
         self.assertAlmostEqual(cur, ref, delta=delta)
@@ -522,18 +607,20 @@ class UraniumOxide_TestCase(_Material_Test, unittest.TestCase):
 
     def test_getDensityExpansion3D(self):
         expectedTemperature = 100.0
-        self.mat.p.refDens = 10.9
-        density3D = self.mat.density3KgM3(Tc=expectedTemperature)
-        self.assertAlmostEqual(10.86792660463439e3, density3D)
+
+        ref_density = 10.86792660463439e3
+        test_density = self.mat.density3KgM3(Tc=expectedTemperature)
+        error = math.fabs((ref_density - test_density) / ref_density)
+        self.assertLess(error, 0.005)
 
     def test_removeNucMassFrac(self):
         self.mat.removeNucMassFrac("O")
-        massFracs = [str(k) for k in self.mat.p.massFrac.keys()]
+        massFracs = [str(k) for k in self.mat.massFrac.keys()]
         self.assertListEqual(["U235", "U238"], massFracs)
 
     def test_densityTimesHeatCapactiy(self):
         Tc = 500.0
-        expectedRhoCp = self.mat.density(Tc=Tc) * 1000.0 * self.mat.heatCapacity(Tc=Tc)
+        expectedRhoCp = self.mat.density3(Tc=Tc) * 1000.0 * self.mat.heatCapacity(Tc=Tc)
         self.assertAlmostEqual(expectedRhoCp, self.mat.densityTimesHeatCapacity(Tc=Tc))
 
     def test_getTempChangeForDensityChange(self):
@@ -549,23 +636,31 @@ class UraniumOxide_TestCase(_Material_Test, unittest.TestCase):
 
     def test_duplicate(self):
         duplicateU = self.mat.duplicate()
-        for key in self.mat.p:
-            self.assertEqual(duplicateU.p[key], self.mat.p[key])
 
-        for key in self.mat.p.massFrac:
-            self.assertEqual(duplicateU.p.massFrac[key], self.mat.p.massFrac[key])
+        for key in self.mat.massFrac:
+            self.assertEqual(duplicateU.massFrac[key], self.mat.massFrac[key])
 
         duplicateMassFrac = self.mat.getMassFracCopy()
-        for key in self.mat.p.massFrac.keys():
-            self.assertEqual(duplicateMassFrac[key], self.mat.p.massFrac[key])
+        for key in self.mat.massFrac.keys():
+            self.assertEqual(duplicateMassFrac[key], self.mat.massFrac[key])
 
     def test_propertyValidTemperature(self):
         self.assertGreater(len(self.mat.propertyValidTemperature), 0)
 
-    def test_adjustTD(self):
-        self.assertEqual(self.mat.theoreticalDensityFrac, 1.0)
-        self.mat.adjustTD(0.123)
-        self.assertEqual(self.mat.theoreticalDensityFrac, 0.123)
+    def test_applyInputParams(self):
+        UO2_TD = materials.UraniumOxide()
+        original = UO2_TD.density3(500)
+        UO2_TD.applyInputParams(TD_frac=0.1)
+        new = UO2_TD.density3(500)
+        ratio = new / original
+        self.assertAlmostEqual(ratio, 0.1)
+
+        UO2_TD = materials.UraniumOxide()
+        original = UO2_TD.density(500)
+        UO2_TD.applyInputParams(TD_frac=0.1)
+        new = UO2_TD.density(500)
+        ratio = new / original
+        self.assertAlmostEqual(ratio, 0.1)
 
 
 class Thorium_TestCase(_Material_Test, unittest.TestCase):
@@ -573,12 +668,12 @@ class Thorium_TestCase(_Material_Test, unittest.TestCase):
 
     def test_setDefaultMassFracs(self):
         self.mat.setDefaultMassFracs()
-        cur = self.mat.p.massFrac
+        cur = self.mat.massFrac
         ref = {"TH232": 1.0}
         self.assertEqual(cur, ref)
 
     def test_density(self):
-        cur = self.mat.density(400)
+        cur = self.mat.density(30)
         ref = 11.68
         accuracy = 4
         self.assertAlmostEqual(cur, ref, accuracy)
@@ -609,10 +704,15 @@ class ThoriumOxide_TestCase(_Material_Test, unittest.TestCase):
     MAT_CLASS = materials.ThoriumOxide
 
     def test_density(self):
-        cur = self.mat.density(400)
+        cur = self.mat.density3(Tc=25)
         ref = 10.00
         accuracy = 4
         self.assertAlmostEqual(cur, ref, accuracy)
+
+        # make sure that material modifications are correctly applied
+        self.mat.applyInputParams(TD_frac=0.1)
+        cur = self.mat.density3(Tc=25)
+        self.assertAlmostEqual(cur, ref * 0.1, accuracy)
 
     def test_linearExpansion(self):
         cur = self.mat.linearExpansion(400)
@@ -639,16 +739,49 @@ class ThoriumOxide_TestCase(_Material_Test, unittest.TestCase):
 class Void_TestCase(_Material_Test, unittest.TestCase):
     MAT_CLASS = materials.Void
 
-    def test_setDefaultMassFracs(self):
+    def test_density3(self):
+        """
+        this material has no density function
+        """
+        self.assertEqual(self.mat.density(500), 0)
+
+    def test_density(self):
         self.mat.setDefaultMassFracs()
-        cur = self.mat.p.density
-        ref = 0.0
-        self.assertEqual(cur, ref)
+        cur = self.mat.density()
+        self.assertEqual(cur, 0.0)
+
+    def test_density3(self):
+        self.mat.setDefaultMassFracs()
+        cur = self.mat.density3()
+        self.assertEqual(cur, 0.0)
 
     def test_linearExpansion(self):
         cur = self.mat.linearExpansion(400)
         ref = 0.0
         self.assertEqual(cur, ref)
+
+    def test_propertyValidTemperature(self):
+        self.assertEqual(len(self.mat.propertyValidTemperature), 0)
+
+
+class Mixture_TestCase(_Material_Test, unittest.TestCase):
+    MAT_CLASS = materials._Mixture
+
+    def test_density3(self):
+        """
+        this material has no density function
+        """
+        self.assertEqual(self.mat.density(500), 0)
+
+    def test_setDefaultMassFracs(self):
+        self.mat.setDefaultMassFracs()
+        cur = self.mat.density(500)
+        ref = 0.0
+        self.assertEqual(cur, ref)
+
+    def test_linearExpansion(self):
+        with self.assertRaises(NotImplementedError):
+            cur = self.mat.linearExpansion(400)
 
     def test_propertyValidTemperature(self):
         self.assertEqual(len(self.mat.propertyValidTemperature), 0)
@@ -682,7 +815,7 @@ class Lead_TestCase(_Material_Test, unittest.TestCase):
 
     def test_setDefaultMassFracs(self):
         self.mat.setDefaultMassFracs()
-        cur = self.mat.p.massFrac
+        cur = self.mat.massFrac
         ref = {"PB": 1}
         self.assertEqual(cur, ref)
 
@@ -712,7 +845,7 @@ class LeadBismuth_TestCase(_Material_Test, unittest.TestCase):
 
     def test_setDefaultMassFracs(self):
         self.mat.setDefaultMassFracs()
-        cur = self.mat.p.massFrac
+        cur = self.mat.massFrac
         ref = {"BI209": 0.555, "PB": 0.445}
         self.assertEqual(cur, ref)
 
@@ -774,11 +907,38 @@ class LeadBismuth_TestCase(_Material_Test, unittest.TestCase):
         self.assertGreater(len(self.mat.propertyValidTemperature), 0)
 
 
+class Copper_TestCase(_Material_Test, unittest.TestCase):
+    MAT_CLASS = materials.Cu
+
+    def test_setDefaultMassFracs(self):
+        cur = self.mat.massFrac
+        ref = {"CU63": 0.6915, "CU65": 0.3085}
+        self.assertEqual(cur, ref)
+
+    def test_densityNeverChanges(self):
+        for tk in [200.0, 400.0, 800.0, 1111.1]:
+            cur = self.mat.density3(tk)
+            self.assertAlmostEqual(cur, 8.913, 4)
+
+    def test_linearExpansionPercent(self):
+        temps = [100.0, 200.0, 600.0]
+        expansions = [-0.2955, -0.1500, 0.5326]
+        for i, temp in enumerate(temps):
+            cur = self.mat.linearExpansionPercent(Tk=temp)
+            self.assertAlmostEqual(cur, expansions[i], 4)
+
+    def test_getChildren(self):
+        self.assertEqual(len(self.mat.getChildren()), 0)
+
+    def test_getChildrenWithFlags(self):
+        self.assertEqual(len(self.mat.getChildrenWithFlags("anything")), 0)
+
+
 class Sulfur_TestCase(_Material_Test, unittest.TestCase):
     MAT_CLASS = materials.Sulfur
 
     def test_setDefaultMassFracs(self):
-        cur = self.mat.p.massFrac
+        cur = self.mat.massFrac
         ref = {"S34": 0.0429, "S36": 0.002, "S33": 0.0076, "S32": 0.9493}
         self.assertEqual(cur, ref)
 
@@ -931,9 +1091,9 @@ class Inconel_TestCase(_Material_Test, unittest.TestCase):
         self.assertAlmostEqual(self.InconelPE16.getMassFrac("CR"), 0.165)
 
     def test_density(self):
-        self.assertEqual(self.Inconel.density(), 8.3600)
+        self.assertEqual(self.Inconel.density(Tc=25), 8.3600)
         self.assertEqual(self.Inconel800.density(Tc=21.0), 7.94)
-        self.assertEqual(self.InconelPE16.density(), 8.00)
+        self.assertEqual(self.InconelPE16.density(Tc=25), 8.00)
 
     def test_Iconel800_linearExpansion(self):
         TcList = [100, 200, 300, 400, 500, 600, 700, 800]
@@ -1367,7 +1527,7 @@ class Alloy200_TestCase(_Material_Test, unittest.TestCase):
 
     def test_nickleContent(self):
         """Assert alloy 200 has more than 99% nickle per its spec"""
-        self.assertGreater(self.mat.p.massFrac["NI"], 0.99)
+        self.assertGreater(self.mat.massFrac["NI"], 0.99)
 
     def test_linearExpansion(self):
         ref = self.mat.linearExpansion(Tc=100)
@@ -1518,13 +1678,13 @@ class TZM_TestCase(_Material_Test, unittest.TestCase):
         self.mat.applyInputParams()
 
         for name, frac in zip(massFracNameList, massFracRefValList):
-            cur = self.mat.p.massFrac[name]
+            cur = self.mat.massFrac[name]
             ref = frac
             self.assertEqual(cur, ref)
 
     def test_01_density(self):
         ref = 10.16  # g/cc
-        cur = self.mat.density()
+        cur = self.mat.density(Tc=21.11)
         self.assertEqual(cur, ref)
 
     def test_02_linearExpansionPercent(self):
@@ -1573,11 +1733,8 @@ class YttriumOxide_TestCase(_Material_Test, unittest.TestCase):
     def test_density(self):
         cur = 5.03
 
-        ref = self.mat.density(Tc=100)
-        self.assertAlmostEqual(cur, ref, ref * 0.01)
-
-        ref = self.mat.density(Tc=300)
-        self.assertAlmostEqual(cur, ref, ref * 0.01)
+        ref = self.mat.density(Tc=25)
+        self.assertAlmostEqual(cur, ref, 2)
 
     def test_linearExpansionPercent(self):
         ref = self.mat.linearExpansionPercent(Tc=100)
@@ -1598,19 +1755,16 @@ class ZincOxide_TestCase(_Material_Test, unittest.TestCase):
     def test_density(self):
         cur = 5.61
 
-        ref = self.mat.density(Tc=100)
-        self.assertAlmostEqual(cur, ref, ref * 0.01)
-
-        ref = self.mat.density(Tc=300)
-        self.assertAlmostEqual(cur, ref, ref * 0.01)
+        ref = self.mat.density3(Tk=10.12)
+        self.assertAlmostEqual(cur, ref, 2)
 
     def test_linearExpansionPercent(self):
         ref = self.mat.linearExpansionPercent(Tc=100)
-        cur = -99670.4933
+        cur = 0.04899694350661124
         self.assertAlmostEqual(ref, cur, delta=abs(ref * 0.001))
 
-        ref = self.mat.linearExpansionPercent(Tc=100)
-        cur = -99670.4933
+        ref = self.mat.linearExpansionPercent(Tc=300)
+        cur = 0.15825020246870625
         self.assertAlmostEqual(ref, cur, delta=abs(ref * 0.001))
 
     def test_propertyValidTemperature(self):
@@ -1661,7 +1815,7 @@ assemblies:
     def loadAssembly(self, materialModifications):
         yamlString = self.baseInput + "\n" + materialModifications
         design = blueprints.Blueprints.load(yamlString)
-        design._prepConstruction(settings.getMasterCs())
+        design._prepConstruction(settings.Settings())
         return design.assemblies["fuel a"]
 
     def test_class1Class2_class1_wt_frac(self):
@@ -1690,7 +1844,7 @@ assemblies:
 
         # should error because class2_custom_isotopics doesn't exist
         with self.assertRaises(KeyError):
-            a = self.loadAssembly(
+            _a = self.loadAssembly(
                 """
         material modifications:
             class1_wt_frac: [0.5]

@@ -21,6 +21,7 @@ dialogues in the GUI. They say things like: "Your ___ setting has the value ___,
 is impossible. Would you like to switch to ___?"
 
 """
+import re
 import os
 
 from armi import context
@@ -32,7 +33,6 @@ from armi.reactor import geometry
 from armi.reactor import systemLayoutInput
 from armi.physics import neutronics
 from armi.utils import directoryChangers
-from armi.settings.fwSettings import globalSettings
 from armi.settings.settingsIO import (
     prompt,
     RunLogPromptCancel,
@@ -66,8 +66,8 @@ class Query:
         self.question = question
         self.correction = correction
         # True if the query is `passed` and does not result in an immediate failure
+        self.corrected = False
         self._passed = False
-        self._corrected = False
         self.autoResolved = True
 
     def __repr__(self):
@@ -107,9 +107,8 @@ class Query:
                         )
                         if make_correction:
                             self.correction()
-                            self._corrected = True
-                        else:
-                            self._passed = True
+                            self.corrected = True
+                        self._passed = True
                     except RunLogPromptCancel as ki:
                         raise KeyboardInterrupt from ki
                 else:
@@ -125,7 +124,6 @@ class Query:
                             raise KeyboardInterrupt
                     except RunLogPromptCancel as ki:
                         raise KeyboardInterrupt from ki
-
             except RunLogPromptUnresolvable:
                 self.autoResolved = False
                 self._passed = True
@@ -190,8 +188,7 @@ class Inspector:
         if context.MPI_RANK != 0:
             return False
 
-        # the following attribute changes will alter what the queries investigate when
-        # resolved
+        # the following attribute changes will alter what the queries investigate when resolved
         correctionsMade = False
         self.cs = cs or self.cs
         runLog.debug("{} executing queries.".format(self.__class__.__name__))
@@ -204,7 +201,7 @@ class Inspector:
         else:
             for query in self.queries:
                 query.resolve()
-                if query._corrected:  # pylint: disable=protected-access
+                if query.corrected:
                     correctionsMade = True
             issues = [
                 query
@@ -221,6 +218,7 @@ class Inspector:
                     "some issues are creating cyclic resolutions: {}".format(issues)
                 )
             runLog.debug("{} has finished querying.".format(self.__class__.__name__))
+
         return correctionsMade
 
     def addQuery(self, condition, statement, question, correction):
@@ -262,6 +260,7 @@ class Inspector:
         """Lambda assignment workaround"""
         # this type of assignment works, but be mindful of
         # scoping when trying different methods
+        runLog.extra(f"Updating setting `{key}` to `{value}`")
         self.cs[key] = value
 
     def _raise(self):  # pylint: disable=no-self-use
@@ -315,8 +314,38 @@ class Inspector:
         self._assignCS("availabilityFactors", None)
         self._assignCS("cycles", [])
 
-    def _setBurnStepsToFour(self):
-        self._assignCS("burnSteps", 4)
+    def _checkForBothSimpleAndDetailedCyclesInputs(self):
+        """
+        Because the only way to check if a setting has been "entered" is to check
+        against the default, if the user specifies all the simple cycle settings
+        _exactly_ as the defaults, this won't be caught. But, it would be very
+        coincidental for the user to _specify_ all the default values when
+        performing any real analysis, so whatever.
+
+        Also, we must bypass the `Settings` getter and reach directly
+        into the underlying `__settings` dict to avoid triggering an error
+        at this stage in the run. Otherwise an error will inherently be raised
+        if the detailed cycles input is used because the simple cycles inputs
+        have defaults. We don't care that those defaults are there, we only
+        have a problem with those defaults being _used_, which will be caught
+        later on.
+        """
+        bothCyclesInputTypesPresent = (
+            self.cs._Settings__settings["cycleLength"].value
+            != self.cs._Settings__settings["cycleLength"].default
+            or self.cs._Settings__settings["cycleLengths"].value
+            != self.cs._Settings__settings["cycleLengths"].default
+            or self.cs._Settings__settings["burnSteps"].value
+            != self.cs._Settings__settings["burnSteps"].default
+            or self.cs._Settings__settings["availabilityFactor"].value
+            != self.cs._Settings__settings["availabilityFactor"].default
+            or self.cs._Settings__settings["availabilityFactors"].value
+            != self.cs._Settings__settings["availabilityFactors"].default
+            or self.cs._Settings__settings["powerFractions"].value
+            != self.cs._Settings__settings["powerFractions"].default
+        ) and self.cs["cycles"] != []
+
+        return bothCyclesInputTypesPresent
 
     def _inspectSettings(self):
         """Check settings for inconsistencies."""
@@ -333,16 +362,6 @@ class Inspector:
             lambda: self._assignCS("outputFileExtension", "png"),
         )
 
-        self.addQuery(
-            lambda: (
-                self.cs[globalSettings.CONF_ZONING_STRATEGY] == "manual"
-                and not self.cs["zoneDefinitions"]
-            ),
-            "`manual` zoningStrategy requires that `zoneDefinitions` setting be defined. Run will have "
-            "no zones.",
-            "",
-            self.NO_ACTION,
-        )
         self.addQuery(
             lambda: (
                 (
@@ -458,12 +477,22 @@ class Inspector:
         )
 
         self.addQuery(
-            lambda: self.cs["numCoupledIterations"] > 0,
-            "You have {0} coupling iterations selected.".format(
-                self.cs["numCoupledIterations"]
+            lambda: (
+                not self.cs["tightCoupling"]
+                and self.cs["tightCouplingMaxNumIters"] != 4
             ),
-            "1 coupling iteration doubles run time (2 triples, etc). Do you want to use 0 instead? ",
-            lambda: self._assignCS("numCoupledIterations", 0),
+            "You've requested a non default number of tight coupling iterations but left tightCoupling: False."
+            "Do you want to set tightCoupling to True?",
+            "",
+            lambda: self._assignCS("tightCoupling", True),
+        )
+
+        self.addQuery(
+            lambda: (not self.cs["tightCoupling"] and self.cs["tightCouplingSettings"]),
+            "You've requested non default tight coupling settings but tightCoupling: False."
+            "Do you want to set tightCoupling to True?",
+            "",
+            lambda: self._assignCS("tightCoupling", True),
         )
 
         self.addQuery(
@@ -483,29 +512,8 @@ class Inspector:
             self._correctCyclesToZeroBurnup,
         )
 
-        def _checkForBothSimpleAndDetailedCyclesInputs():
-            """
-            Note that we must bypass the `Settings` getter and reach directly
-            into the underlying `__settings` dict to avoid triggering an error
-            at this stage in the run. Otherwise an error will inherently be raised
-            if the detailed cycles input is used because the simple cycles inputs
-            have defaults. We don't care that those defaults are there, we only
-            have a problem with those defaults being _used_, which will be caught
-            later on.
-            """
-            bothCyclesInputTypesPresent = (
-                self.cs._Settings__settings["cycleLength"]
-                or self.cs._Settings__settings["cycleLengths"]
-                or self.cs._Settings__settings["burnSteps"]
-                or self.cs._Settings__settings["availabilityFactor"]
-                or self.cs._Settings__settings["availabilityFactors"]
-                or self.cs._Settings__settings["powerFractions"]
-            ) and self.cs["cycles"] != []
-
-            return bothCyclesInputTypesPresent
-
         self.addQuery(
-            _checkForBothSimpleAndDetailedCyclesInputs,
+            self._checkForBothSimpleAndDetailedCyclesInputs,
             "If specifying detailed cycle history with `cycles`, you may not"
             " also use any of the simple cycle history inputs `cycleLength(s)`,"
             " `burnSteps`, `availabilityFactor(s)`, or `powerFractions`."
@@ -719,3 +727,45 @@ def createQueryRevertBadPathToDefault(inspector, settingName, initialLambda=None
         inspector.cs.getSetting(settingName).revertToDefault,
     )
     return query
+
+
+def validateVersion(versionThis: str, versionRequired: str) -> bool:
+    """Helper function to allow users to verify that their version matches the settings file.
+
+    Parameters
+    ----------
+    versionThis: str
+        The version of this ARMI, App, or Plugin.
+        This MUST be in the form: 1.2.3
+    versionRequired: str
+        The version to compare against, say in a Settings file.
+        This must be in one of the forms: 1.2.3, 1.2, or 1
+
+    Returns
+    -------
+    bool
+        Does this version match the version in the Settings file/object?
+    """
+    fullV = "\d+\.\d+\.\d+"
+    medV = "\d+\.\d+"
+    minV = "\d+"
+
+    if versionRequired == "uncontrolled":
+        # This default flag means we don't want to check the version.
+        return True
+    elif re.search(fullV, versionThis) is None:
+        raise ValueError(
+            "The input version ({0}) does not match the required format: {1}".format(
+                versionThis, fullV
+            )
+        )
+    elif re.search(fullV, versionRequired) is not None:
+        return versionThis == versionRequired
+    elif re.search(medV, versionRequired) is not None:
+        return ".".join(versionThis.split(".")[:2]) == versionRequired
+    elif re.search(minV, versionRequired) is not None:
+        return versionThis.split(".")[0] == versionRequired
+    else:
+        raise ValueError(
+            "The required version is not a valid format: {}".format(versionRequired)
+        )

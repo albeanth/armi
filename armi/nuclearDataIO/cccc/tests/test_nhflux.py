@@ -13,18 +13,14 @@
 # limitations under the License.
 
 """Test reading/writing of NHFLUX dataset."""
+# pylint: disable=missing-function-docstring,missing-class-docstring,protected-access,invalid-name,no-self-use,no-method-argument,import-outside-toplevel
 import os
-import re
-import shutil
-import subprocess
-import tempfile
 import unittest
 
 import numpy as np
 
-from armi import settings
 from armi.nuclearDataIO.cccc import nhflux
-
+from armi.utils.directoryChangers import TemporaryDirectoryChanger
 
 THIS_DIR = os.path.dirname(__file__)
 
@@ -33,58 +29,6 @@ SIMPLE_HEXZ_NHFLUX = os.path.join(THIS_DIR, "fixtures", "simple_hexz.nhflux")
 SIMPLE_HEXZ_NHFLUX_VARIANT = os.path.join(
     THIS_DIR, "fixtures", "simple_hexz.nhflux.variant"
 )
-
-
-def createSIMPLE_HEXZ_NHFLUX(runVariant=False):
-    """
-    Create NHFLUX file for storage into *fixtures* directory.
-
-    In order to test the reading of NHFLUX file, there is a need to provide one such
-    file for testing. This function runs the provided DIF3D input, and generates an
-    NHFLUX file. The DIF3D input is a modified version of test case 01 from the DIF3D
-    code package. It uses the 4-group cross sections located in the last part of the
-    input. The modification includes:
-
-    1) reduce the geometry to 3 rows of assemblies in full core geometry;
-    2) reduce the fuel assembly to contain 6 nodes only;
-    3) change the dimension to be whole numbers.
-
-    In this way, the produced NHFLUX file is fairly small in size that makes it suitable
-    for testing purposes. Another benefit of the simplified input is the trivial
-    computer running time. It should take < 10 seconds to generate the NHFLUX file.
-    Nevertheless, since the diffusion approximation is likely to be invalid for such a
-    small-size core, results are not meant for physics benchmarking or other realistic
-    applications.
-
-    .. important::
-        This requires both DIF3D and the TerraPower's DIF3D ARMI plugin in order to run.
-        The latest output is shipped with the test, but regenerating or updating it will
-        require these extra dependencies. Also, if you don't have them you can ask
-        someone that does and maybe they can hook you up.
-    """
-    DIF3D_EXE = settings.getMasterCs()["dif3d"]
-
-    runDir = tempfile.mkdtemp()
-    tempInputPath = os.path.join(runDir, "input")
-    shutil.copy(SIMPLE_HEXZ_INP, tempInputPath)
-
-    # If running VARIANT, include a Card 12 on A.DIF3D. Runs P1P0 with isotropic cross
-    # sections.
-    if runVariant:
-        with open(tempInputPath, "r") as fIn:
-            dif3dInput = fIn.read()
-        oldString = "UNFORM=A.NIP3"
-        newString = "12  40601  10101  0  0  0  -1  0  0  0  1  0\n" + oldString
-        dif3dInput = re.sub(oldString, newString, dif3dInput, count=1)
-        with open(tempInputPath, "w") as fOut:
-            fOut.write(dif3dInput)
-
-    with open(tempInputPath, "r") as fIn:
-        _process = subprocess.run(DIF3D_EXE, cwd=runDir, capture_output=True, stdin=fIn)
-
-    copyName = SIMPLE_HEXZ_NHFLUX if not runVariant else SIMPLE_HEXZ_NHFLUX_VARIANT
-    shutil.copy(os.path.join(runDir, "NHFLUX"), copyName)
-    shutil.rmtree(runDir)
 
 
 class TestNhflux(unittest.TestCase):
@@ -180,13 +124,13 @@ class TestNhflux(unittest.TestCase):
 
     def test_write(self):
         """Verify binary equivalence of written binary file."""
-        nhflux.NhfluxStream.writeBinary(self.nhf, "NHFLUX2")
-        with open(SIMPLE_HEXZ_NHFLUX, "rb") as f1, open("NHFLUX2", "rb") as f2:
-            expectedData = f1.read()
-            actualData = f2.read()
-        for expected, actual in zip(expectedData, actualData):
-            self.assertEqual(expected, actual)
-        os.remove("NHFLUX2")
+        with TemporaryDirectoryChanger():
+            nhflux.NhfluxStream.writeBinary(self.nhf, "NHFLUX2")
+            with open(SIMPLE_HEXZ_NHFLUX, "rb") as f1, open("NHFLUX2", "rb") as f2:
+                expectedData = f1.read()
+                actualData = f2.read()
+            for expected, actual in zip(expectedData, actualData):
+                self.assertEqual(expected, actual)
 
 
 class TestNhfluxVariant(unittest.TestCase):
@@ -211,7 +155,6 @@ class TestNhfluxVariant(unittest.TestCase):
         self.assertEqual(self.nhf.metadata["nMoms"], 0)
 
     def test_fluxMoments(self):
-        """"""
         # node 1 (ring=1, position=1), axial=3, group=2
         i = 0
         self.assertEqual(self.nhf.geodstCoordMap[i], 13)
@@ -239,16 +182,16 @@ class TestNhfluxVariant(unittest.TestCase):
         )
 
     def test_write(self):
-        """
-        Verify binary equivalence of written binary file.
-        """
-        nhflux.NhfluxStreamVariant.writeBinary(self.nhf, "NHFLUX2")
-        with open(SIMPLE_HEXZ_NHFLUX_VARIANT, "rb") as f1, open("NHFLUX2", "rb") as f2:
-            expectedData = f1.read()
-            actualData = f2.read()
-        for expected, actual in zip(expectedData, actualData):
-            self.assertEqual(expected, actual)
-        os.remove("NHFLUX2")
+        """Verify binary equivalence of written binary file"""
+        with TemporaryDirectoryChanger():
+            nhflux.NhfluxStreamVariant.writeBinary(self.nhf, "NHFLUX2")
+            with open(SIMPLE_HEXZ_NHFLUX_VARIANT, "rb") as f1, open(
+                "NHFLUX2", "rb"
+            ) as f2:
+                expectedData = f1.read()
+                actualData = f2.read()
+            for expected, actual in zip(expectedData, actualData):
+                self.assertEqual(expected, actual)
 
 
 if __name__ == "__main__":

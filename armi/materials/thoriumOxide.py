@@ -22,21 +22,18 @@ Data is from [#IAEA-TECDOCT-1450]_.
 """
 from armi import runLog
 from armi.utils.units import getTk
-from armi.materials.material import FuelMaterial
+from armi.materials.material import Material, FuelMaterial, SimpleSolid
 
 
-class ThoriumOxide(FuelMaterial):
+class ThoriumOxide(FuelMaterial, SimpleSolid):
     name = "ThO2"
     propertyValidTemperature = {"linear expansion": ((298, 1223), "K")}
-    theoreticalDensityFrac = 1.0
 
-    def adjustTD(self, val):
-        self.theoreticalDensityFrac = val
+    def __init__(self):
+        Material.__init__(self)
+        self.refDens = 10.00
 
-    def getTD(self):
-        return self.theoreticalDensityFrac
-
-    def applyInputParams(self, TD_frac, *args, **kwargs):
+    def applyInputParams(self, TD_frac=None, *args, **kwargs):
         if TD_frac is not None:
             if TD_frac > 1.0:
                 runLog.warning(
@@ -70,13 +67,10 @@ class ThoriumOxide(FuelMaterial):
         grams of Th-232 = 232.030806 g/mol* 1 mol  =  232.030806 g
         grams of Oxygen = 15.9994 g/mol* 2 mol = 31.9988 g
         total=264.029606 g.
-        Mass fractions are computed from this."""
+        Mass fractions are computed from this.
+        """
         self.setMassFrac("TH232", 0.8788)
         self.setMassFrac("O16", 0.1212)
-
-    def density(self, Tk=None, Tc=None):
-        """g/cc from IAEA TE 1450"""
-        return 10.00 * self.getTD()
 
     def linearExpansion(self, Tk=None, Tc=None):
         r"""m/m/K from IAEA TE 1450"""
@@ -103,10 +97,11 @@ class ThoriumOxide(FuelMaterial):
         r"""melting point in K from IAEA TE 1450"""
         return 3643.0
 
+    def density3(self, Tk=None, Tc=None):
+        return Material.density3(self, Tk, Tc) * self.getTD()
+
 
 class ThO2(ThoriumOxide):
-    """
-    Another name for ThoriumOxide.
-    """
+    """Another name for ThoriumOxide."""
 
     pass

@@ -38,10 +38,12 @@ HeatCapacityConstants = collections.namedtuple(
 )
 
 
-class UraniumOxide(material.FuelMaterial):
+class UraniumOxide(material.FuelMaterial, material.SimpleSolid):
     name = "Uranium Oxide"
 
     enrichedNuclide = "U235"
+
+    REFERENCE_TEMPERATURE = 27
 
     # ORNL/TM-2000/351 section 4.3
     heatCapacityConstants = HeatCapacityConstants(
@@ -53,7 +55,7 @@ class UraniumOxide(material.FuelMaterial):
     propertyUnits = {"heat capacity": "J/mol-K"}
 
     propertyValidTemperature = {
-        "density": ((300, 3100), "K"),
+        "density3": ((300, 3100), "K"),
         "heat capacity": ((298.15, 3120), "K"),
         "linear expansion": ((273, 3120), "K"),
         "linear expansion percent": ((273, __meltingPoint), "K"),
@@ -65,8 +67,6 @@ class UraniumOxide(material.FuelMaterial):
         "linear expansion": "Thermophysical Properties of MOX and UO2 Fuels Including the Effects of Irradiation. S.G. Popov, et.al. Oak Ridge National Laboratory. ORNL/TM-2000/351",
         "heat capacity": "ORNL/TM-2000/351",
     }
-
-    theoreticalDensityFrac = 1.0  # Default value
 
     thermalScatteringLaws = (
         tsl.byNbAndCompound[nb.byName["U"], tsl.UO2],
@@ -101,11 +101,9 @@ class UraniumOxide(material.FuelMaterial):
         1.718,
     ]
 
-    def adjustTD(self, val: float) -> None:
-        self.theoreticalDensityFrac = val
-
-    def getTD(self) -> float:
-        return self.theoreticalDensityFrac
+    def __init__(self):
+        material.FuelMaterial.__init__(self)
+        self.refDens = self.density3(Tk=self.refTempK)
 
     def applyInputParams(
         self, U235_wt_frac: float = None, TD_frac: float = None, *args, **kwargs
@@ -129,8 +127,7 @@ class UraniumOxide(material.FuelMaterial):
                     label="Zero theoretical density",
                 )
             self.adjustTD(td)
-        else:
-            self.adjustTD(1.00)  # default to fully dense.
+
         material.FuelMaterial.applyInputParams(self, *args, **kwargs)
 
     def setDefaultMassFracs(self) -> None:
@@ -162,14 +159,14 @@ class UraniumOxide(material.FuelMaterial):
         """
         return self.__meltingPoint
 
-    def density(self, Tk: float = None, Tc: float = None) -> float:
+    def density3(self, Tk: float = None, Tc: float = None) -> float:
         """
         Density in (g/cc)
 
         Polynomial line fit to data from [#ornltm2000]_ on page 11.
         """
         Tk = getTk(Tc, Tk)
-        self.checkPropertyTempRange("density", Tk)
+        self.checkPropertyTempRange("density3", Tk)
 
         return (-1.01147e-7 * Tk ** 2 - 1.29933e-4 * Tk + 1.09805e1) * self.getTD()
 

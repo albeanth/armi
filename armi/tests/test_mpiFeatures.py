@@ -23,7 +23,7 @@ mpiexec -n 2 python -m pytest armi/tests/test_mpiFeatures.py
 or
 mpiexec.exe -n 2 python -m pytest armi/tests/test_mpiFeatures.py
 """
-# pylint: disable=abstract-method,no-self-use,unused-argument
+# pylint: disable=missing-function-docstring,missing-class-docstring,protected-access,invalid-name,no-self-use,no-method-argument,import-outside-toplevel
 from distutils.spawn import find_executable
 import os
 import unittest
@@ -34,6 +34,7 @@ from armi import settings
 from armi.interfaces import Interface
 from armi.mpiActions import DistributeStateAction
 from armi.operators import OperatorMPI
+from armi.physics.neutronics.const import CONF_CROSS_SECTION
 from armi.reactor import blueprints
 from armi.reactor import reactors
 from armi.reactor.parameters import parameterDefinitions
@@ -48,6 +49,8 @@ if find_executable("mpiexec.exe") is not None:
     MPI_EXE = "mpiexec.exe"
 elif find_executable("mpiexec") is not None:
     MPI_EXE = "mpiexec"
+
+MPI_COMM = context.MPI_COMM
 
 
 class FailingInterface1(Interface):
@@ -176,9 +179,9 @@ class MpiDistributeStateTests(unittest.TestCase):
             original = {ss.name: ss.value for ss in self.cs.values()}
             current = {ss.name: ss.value for ss in self.action.o.cs.values()}
             # remove values that are *expected to be* different...
-            # crossSectionControl is removed because unittest is being mean about
+            # CONF_CROSS_SECTION is removed because unittest is being mean about
             # comparing dicts...
-            for key in ["stationaryBlockFlags", "verbosity", "crossSectionControl"]:
+            for key in ["stationaryBlockFlags", "verbosity", CONF_CROSS_SECTION]:
                 if key in original:
                     del original[key]
                 if key in current:
@@ -262,7 +265,7 @@ class MpiPathToolsTests(unittest.TestCase):
             self.assertTrue(os.path.exists(filePath0))
             with self.assertRaises(Exception):
                 pathTools.cleanPath(filePath0, mpiRank=context.MPI_RANK)
-            context.waitAll()
+            MPI_COMM.barrier()
 
             # TEST 1: Delete a single file
             filePath1 = "test1_cleanPathNoMpi_mongoose"
@@ -270,7 +273,7 @@ class MpiPathToolsTests(unittest.TestCase):
 
             self.assertTrue(os.path.exists(filePath1))
             pathTools.cleanPath(filePath1, mpiRank=context.MPI_RANK)
-            context.waitAll()
+            MPI_COMM.barrier()
             self.assertFalse(os.path.exists(filePath1))
 
             # TEST 2: Delete an empty directory
@@ -279,7 +282,7 @@ class MpiPathToolsTests(unittest.TestCase):
 
             self.assertTrue(os.path.exists(dir2))
             pathTools.cleanPath(dir2, mpiRank=context.MPI_RANK)
-            context.waitAll()
+            MPI_COMM.barrier()
             self.assertFalse(os.path.exists(dir2))
 
             # TEST 3: Delete a directory with two files inside
@@ -296,7 +299,7 @@ class MpiPathToolsTests(unittest.TestCase):
             self.assertTrue(os.path.exists(os.path.join(dir3, "file1.txt")))
             self.assertTrue(os.path.exists(os.path.join(dir3, "file2.txt")))
             pathTools.cleanPath(dir3, mpiRank=context.MPI_RANK)
-            context.waitAll()
+            MPI_COMM.barrier()
             self.assertFalse(os.path.exists(dir3))
 
 

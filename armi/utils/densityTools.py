@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Assorted utilities to help with basic density calculations"""
 from typing import Tuple, List, Dict
 
 from armi.nucDirectory import nucDir, nuclideBases, elements
@@ -191,7 +192,10 @@ def formatMaterialCard(
         for nuc in densities
     ):
         return []  # no valid nuclides to write
-    mCard = ["m{matNum}\n".format(matNum=matNum)]
+    if matNum >= 0:
+        mCard = ["m{matNum}\n".format(matNum=matNum)]
+    else:
+        mCard = ["m{}\n"]
     for nuc, dens in sorted(densities.items()):
         # skip LFPs and Dummies.
         if isinstance(nuc, (nuclideBases.LumpNuclideBase)):
@@ -260,7 +264,6 @@ def normalizeNuclideList(nuclideVector, normalization=1.0):
     nuclideVector : dict
         dictionary of values indexed by nuclide identifiers -- e.g. nucNames or nuclideBases
     """
-
     normalizationFactor = sum(nuclideVector.values()) / normalization
 
     for nucName, mFrac in nuclideVector.items():
@@ -402,22 +405,22 @@ def applyIsotopicsMix(
     fertileMassFracs : dict
         Nuclide names and weight fractions of the class 2 nuclides
     """
-    total = sum(material.p.massFrac.values())
+    total = sum(material.massFrac.values())
     hm = 0.0
-    for nucName, massFrac in material.p.massFrac.items():
+    for nucName, massFrac in material.massFrac.items():
         nb = nuclideBases.byName[nucName]
         if nb.isHeavyMetal():
             hm += massFrac
     hmFrac = hm / total
-    hmEnrich = material.p.class1_wt_frac
+    hmEnrich = material.class1_wt_frac
     for nucName in (
         set(enrichedMassFracs.keys())
         .union(set(fertileMassFracs.keys()))
-        .union(set(material.p.massFrac.keys()))
+        .union(set(material.massFrac.keys()))
     ):
         nb = nuclideBases.byName[nucName]
         if nb.isHeavyMetal():
-            material.p.massFrac[nucName] = hmFrac * (
+            material.massFrac[nucName] = hmFrac * (
                 hmEnrich * enrichedMassFracs.get(nucName, 0.0)
                 + (1 - hmEnrich) * fertileMassFracs.get(nucName, 0.0)
             )

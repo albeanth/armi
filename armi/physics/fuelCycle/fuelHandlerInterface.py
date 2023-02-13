@@ -14,10 +14,13 @@
 
 """A place for the FuelHandler's Interface"""
 
-from armi import runLog
 from armi import interfaces
-from armi.utils import plotting
+from armi import runLog
 from armi.physics.fuelCycle import fuelHandlerFactory
+from armi.physics.fuelCycle.settings import CONF_PLOT_SHUFFLE_ARROWS
+from armi.physics.fuelCycle.settings import CONF_RUN_LATTICE_BEFORE_SHUFFLING
+from armi.physics.fuelCycle.settings import CONF_SHUFFLE_LOGIC
+from armi.utils import plotting
 
 
 class FuelHandlerInterface(interfaces.Interface):
@@ -48,7 +51,7 @@ class FuelHandlerInterface(interfaces.Interface):
             cs.getSetting(settingName): [
                 cs[settingName],
             ]
-            for settingName in ["shuffleLogic", "explicitRepeatShuffles"]
+            for settingName in [CONF_SHUFFLE_LOGIC, "explicitRepeatShuffles"]
             if cs[settingName]
         }
         return files
@@ -62,14 +65,24 @@ class FuelHandlerInterface(interfaces.Interface):
         # if lattice physics is requested, compute it here instead of after fuel management.
         # This enables XS to exist for branch searching, etc.
         mc2 = self.o.getInterface(function="latticePhysics")
-        if mc2 and self.cs["runLatticePhysicsBeforeShuffling"]:
+        if mc2 and self.cs[CONF_RUN_LATTICE_BEFORE_SHUFFLING]:
             runLog.extra(
-                'Running {0} lattice physics before fuel management due to the "runLatticePhysicsBeforeShuffling"'
-                " setting being activated.".format(mc2)
+                'Running {0} lattice physics before fuel management due to the "{1}"'
+                " setting being activated.".format(
+                    mc2, CONF_RUN_LATTICE_BEFORE_SHUFFLING
+                )
             )
             mc2.interactBOC(cycle=cycle)
 
-        if self.enabled():
+        if self.enabled() and (
+            self.cs["loadStyle"] != "fromDB"
+            or self.cs["startNode"] == 0
+            or (self.cs["startCycle"] != cycle)
+        ):
+            # in restart cases, only do this if restarting at BOC to avoid duplicating shuffles
+            # the logic to accomplish this is a bit long because we don't pass the
+            # timeNode into interactBOC hooks. Otherwise it would be much easier
+            # to determine when to call this or not
             self.manageFuel(cycle)
 
     def interactEOC(self, cycle=None):
@@ -96,7 +109,7 @@ class FuelHandlerInterface(interfaces.Interface):
         self.r.core.locateAllAssemblies()
         shuffleFactors, _ = fh.getFactorList(cycle)
         fh.outage(shuffleFactors)  # move the assemblies around
-        if self.cs["plotShuffleArrows"]:
+        if self.cs[CONF_PLOT_SHUFFLE_ARROWS]:
             arrows = fh.makeShuffleArrows()
             plotting.plotFaceMap(
                 self.r.core,

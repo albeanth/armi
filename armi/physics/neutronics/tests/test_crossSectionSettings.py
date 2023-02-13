@@ -13,20 +13,22 @@
 # limitations under the License.
 """XS Settings tests"""
 # pylint: disable=missing-function-docstring,missing-class-docstring,abstract-method,protected-access,unused-variable
-import unittest
 import io
+import unittest
 
 from ruamel.yaml import YAML
 import voluptuous as vol
 
 from armi import settings
-from armi.settings import caseSettings
+from armi.physics.neutronics.const import CONF_CROSS_SECTION
+from armi.physics.neutronics.crossSectionSettings import CONF_BLOCK_REPRESENTATION
+from armi.physics.neutronics.crossSectionSettings import CONF_GEOM
 from armi.physics.neutronics.crossSectionSettings import XSModelingOptions
-from armi.physics.neutronics.crossSectionSettings import XSSettings
 from armi.physics.neutronics.crossSectionSettings import XSSettingDef
+from armi.physics.neutronics.crossSectionSettings import XSSettings
 from armi.physics.neutronics.crossSectionSettings import xsSettingsValidator
 from armi.physics.neutronics.tests.test_neutronicsPlugin import XS_EXAMPLE
-from armi.physics.neutronics.const import CONF_CROSS_SECTION
+from armi.settings import caseSettings
 
 
 class TestCrossSectionSettings(unittest.TestCase):
@@ -39,21 +41,41 @@ class TestCrossSectionSettings(unittest.TestCase):
         )
         self.assertEqual("AA", xsModel.xsID)
         self.assertEqual("0D", xsModel.geometry)
-        self.assertEqual(True, xsModel.criticalBuckling)
         self.assertEqual("Median", xsModel.blockRepresentation)
+        self.assertFalse(xsModel.fluxIsPregenerated)
+        self.assertFalse(xsModel.xsIsPregenerated)
+        self.assertTrue(xsModel.criticalBuckling)
 
     def test_pregeneratedCrossSections(self):
         cs = settings.Settings()
         xs = XSSettings()
-        xa = XSModelingOptions("XA", fileLocation=["ISOXA"])
+        xa = XSModelingOptions("XA", xsFileLocation=["ISOXA"])
         xs["XA"] = xa
-        self.assertEqual(["ISOXA"], xa.fileLocation)
+        self.assertEqual(["ISOXA"], xa.xsFileLocation)
         self.assertNotIn("XB", xs)
         xs.setDefaults(
             cs["xsBlockRepresentation"], cs["disableBlockTypeExclusionInXsGeneration"]
         )
         # Check that the file location of 'XB' still points to the same file location as 'XA'.
         self.assertEqual(xa, xs["XB"])
+        self.assertFalse(xa.fluxIsPregenerated)
+        self.assertTrue(xa.xsIsPregenerated)
+        self.assertFalse(xa.criticalBuckling)
+
+    def test_pregeneratedFluxInputs(self):
+        xsModel = XSModelingOptions(
+            xsID="AA",
+            fluxFileLocation="ISOAA",
+            geometry="0D",
+            criticalBuckling=True,
+            blockRepresentation="Median",
+        )
+        self.assertEqual("AA", xsModel.xsID)
+        self.assertEqual("0D", xsModel.geometry)
+        self.assertEqual("ISOAA", xsModel.fluxFileLocation)
+        self.assertTrue(xsModel.fluxIsPregenerated)
+        self.assertTrue(xsModel.criticalBuckling)
+        self.assertEqual("Median", xsModel.blockRepresentation)
 
     def test_homogeneousXsDefaultSettingAssignment(self):
         """
@@ -138,7 +160,7 @@ class TestCrossSectionSettings(unittest.TestCase):
         with self.assertRaises(TypeError):
             # This will fail because it is not the required
             # Dict[str: Dict] structure
-            xsSettingsValidator({"geometry": "4D"})
+            xsSettingsValidator({CONF_GEOM: "4D"})
 
         with self.assertRaises(vol.error.MultipleInvalid):
             # This will fail because it has an invalid type for ``driverID``
@@ -147,12 +169,12 @@ class TestCrossSectionSettings(unittest.TestCase):
         with self.assertRaises(vol.error.MultipleInvalid):
             # This will fail because it has an invalid value for
             # the ``blockRepresentation``
-            xsSettingsValidator({"AA": {"blockRepresentation": "Invalid"}})
+            xsSettingsValidator({"AA": {CONF_BLOCK_REPRESENTATION: "Invalid"}})
 
         with self.assertRaises(vol.error.MultipleInvalid):
             # This will fail because the ``xsID`` is not one or two
             # characters
-            xsSettingsValidator({"AAA": {"blockRepresentation": "Average"}})
+            xsSettingsValidator({"AAA": {CONF_BLOCK_REPRESENTATION: "Average"}})
 
 
 class Test_XSSettings(unittest.TestCase):
@@ -211,7 +233,7 @@ class Test_XSSettings(unittest.TestCase):
         # a dictionary.
         cs = _setInitialXSSettings()
         cs[CONF_CROSS_SECTION].update(
-            {"CA": XSModelingOptions("CA", geometry="0D"), "DA": {"geometry": "0D"}}
+            {"CA": XSModelingOptions("CA", geometry="0D"), "DA": {CONF_GEOM: "0D"}}
         )
         self.assertIn("AA", cs[CONF_CROSS_SECTION])
         self.assertIn("BA", cs[CONF_CROSS_SECTION])
@@ -266,12 +288,12 @@ class Test_XSSettings(unittest.TestCase):
     def test_csBlockRepresentationFileLocation(self):
         """
         Test that default blockRepresentation is applied correctly to a
-        XSModelingOption that has the ``fileLocation`` attribute defined.
+        XSModelingOption that has the ``xsFileLocation`` attribute defined.
         """
         cs = caseSettings.Settings()
         cs["xsBlockRepresentation"] = "FluxWeightedAverage"
         cs[CONF_CROSS_SECTION] = XSSettings()
-        cs[CONF_CROSS_SECTION]["AA"] = XSModelingOptions("AA", fileLocation=[])
+        cs[CONF_CROSS_SECTION]["AA"] = XSModelingOptions("AA", xsFileLocation=[])
 
         # Check FluxWeightedAverage
         cs[CONF_CROSS_SECTION].setDefaults(
@@ -283,7 +305,7 @@ class Test_XSSettings(unittest.TestCase):
 
         # Check Average
         cs["xsBlockRepresentation"] = "Average"
-        cs[CONF_CROSS_SECTION]["AA"] = XSModelingOptions("AA", fileLocation=[])
+        cs[CONF_CROSS_SECTION]["AA"] = XSModelingOptions("AA", xsFileLocation=[])
         cs[CONF_CROSS_SECTION].setDefaults(
             cs["xsBlockRepresentation"], cs["disableBlockTypeExclusionInXsGeneration"]
         )
@@ -292,7 +314,7 @@ class Test_XSSettings(unittest.TestCase):
         # Check Median
         cs["xsBlockRepresentation"] = "Average"
         cs[CONF_CROSS_SECTION]["AA"] = XSModelingOptions(
-            "AA", fileLocation=[], blockRepresentation="Median"
+            "AA", xsFileLocation=[], blockRepresentation="Median"
         )
         cs[CONF_CROSS_SECTION].setDefaults(
             cs["xsBlockRepresentation"], cs["disableBlockTypeExclusionInXsGeneration"]

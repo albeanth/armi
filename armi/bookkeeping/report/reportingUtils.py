@@ -16,6 +16,7 @@ r"""
 A collection of miscellaneous functions used by ReportInterface to generate
 various reports
 """
+from copy import copy
 import collections
 import os
 import pathlib
@@ -24,7 +25,6 @@ import sys
 import tabulate
 import textwrap
 import time
-from copy import copy
 
 import numpy
 
@@ -33,6 +33,7 @@ from armi import interfaces
 from armi import runLog
 from armi.bookkeeping import report
 from armi.operators import RunTypes
+from armi.physics.fuelCycle.settings import CONF_SHUFFLE_LOGIC
 from armi.reactor.components import ComponentType
 from armi.reactor.flags import Flags
 from armi.utils import getFileSHA1Hash
@@ -40,7 +41,6 @@ from armi.utils import iterables
 from armi.utils import plotting
 from armi.utils import textProcessors
 from armi.utils import units
-from armi.utils.mathematics import findClosest
 
 
 # Set to prevent the image and text from being too small to read.
@@ -235,6 +235,15 @@ def getInterfaceStackSummary(o):
     )
     text = text
     return text
+
+
+def writeTightCouplingConvergenceSummary(convergenceSummary):
+    runLog.info("Tight Coupling Convergence Summary: Norm Type = Inf")
+    runLog.info(
+        tabulate.tabulate(
+            convergenceSummary, headers="keys", showindex=True, tablefmt="armi"
+        )
+    )
 
 
 def writeAssemblyMassSummary(r):
@@ -594,92 +603,6 @@ def summarizePower(core):
         )
 
 
-def summarizeZones(core, cs):
-    r"""Summarizes the active zone and other zone.
-
-    Parameters
-    ----------
-    core:  armi.reactor.reactors.Core
-    cs: armi.settings.caseSettings.Settings
-
-    """
-
-    totPow = core.getTotalBlockParam("power")
-    if not totPow:
-        # protect against divide-by-zero
-        return
-    powList = []  # eventually will be a sorted list of power
-    for a in core.getAssemblies():
-        if a.hasFlags(Flags.FUEL):
-            aPow = a.calcTotalParam("power")
-            powList.append((aPow / totPow, a))
-    powList.sort()  # lowest power assems first.
-
-    # now build "low power region" and high power region.
-    # at BOL (cycle 0) just take all feeds as low power. (why not just use power fractions?,
-    # oh, because if you do that, a few igniters will make up the 1st 5% of the power.)
-    totFrac = 0.0
-    lowPow = []
-    highPow = []
-    pFracList = []  # list of power fractions in the high power zone.
-
-    for pFrac, a in powList:
-        if core.r.p.cycle > 0 and totFrac <= cs["lowPowerRegionFraction"]:
-            lowPow.append(a)
-        elif (
-            core.r.p.cycle == 0
-            and a.hasFlags(Flags.FEED | Flags.FUEL)
-            and a.getMaxUraniumMassEnrich() > 0.01
-        ):
-            lowPow.append(a)
-        else:
-            highPow.append(a)
-            pFracList.append(pFrac)
-        totFrac += pFrac
-
-    if not pFracList:
-        # sometimes this is empty (why?), which causes an error below when
-        # calling max(pFracList)
-        return
-
-    if abs(totFrac - 1.0) < 1e-4:
-        runLog.warning("total power fraction not equal to sum of assembly powers.")
-
-    peak = max(pFracList)  # highest power assembly
-    peakIndex = pFracList.index(peak)
-    peakAssem = highPow[peakIndex]
-
-    avgPFrac = sum(pFracList) / len(pFracList)  # true mean power fraction
-    # the closest-to-average pfrac in the list
-    _avgAssemPFrac, avgIndex = findClosest(pFracList, avgPFrac, indx=True)
-    avgAssem = highPow[avgIndex]  # the actual average assembly
-
-    # ok, now need counts, and peak and avg. flow and power in high power region.
-    mult = core.powerMultiplier
-
-    summary = "Zone Summary For Safety Analysis cycle {0}\n".format(core.r.p.cycle)
-    summary += "  Assemblies in high-power zone: {0}\n".format(len(highPow) * mult)
-    summary += "  Assemblies in low-power zone:  {0}\n".format(len(lowPow) * mult)
-    summary += " " * 13 + "{0:15s} {1:15s} {2:15s} {3:15s}\n".format(
-        "Location", "Power (W)", "Flow (kg/s)", "Pu frac"
-    )
-
-    for lab, a in [("Peak", peakAssem), ("Average", avgAssem)]:
-        flow = a.p.THmassFlowRate
-        if not flow:
-            runLog.warning("No TH data. Reporting zero flow.")
-            # no TH for some reason
-            flow = 0.0
-        puFrac = a.getPuFrac()
-        ring, pos = a.spatialLocator.getRingPos()
-        summary += (
-            "  {0:10s} ({ring:02d}, {pos:02d}) {1:15.6E} {2:15.6E} {pu:15.6E}\n".format(
-                lab, a.calcTotalParam("power"), flow, ring=ring, pos=pos, pu=puFrac
-            )
-        )
-    runLog.important(summary)
-
-
 def makeCoreDesignReport(core, cs):
     r"""Builds report to summarize core design inputs
 
@@ -717,7 +640,7 @@ def _setGeneralCoreDesignData(cs, coreDesignTable):
     )
     report.setData(
         "Fuel Shuffling Logic File",
-        "{}".format(cs["shuffleLogic"]),
+        "{}".format(cs[CONF_SHUFFLE_LOGIC]),
         coreDesignTable,
         report.DESIGN,
     )
@@ -851,8 +774,8 @@ def _setGeneralSimulationData(core, cs, coreDesignTable):
         "Full Core Model", "{}".format(core.isFullCore), coreDesignTable, report.DESIGN
     )
     report.setData(
-        "Loose Physics Coupling Enabled",
-        "{}".format(bool(cs["looseCoupling"])),
+        "Tight Physics Coupling Enabled",
+        "{}".format(bool(cs["tightCoupling"])),
         coreDesignTable,
         report.DESIGN,
     )

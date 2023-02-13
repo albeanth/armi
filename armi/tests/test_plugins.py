@@ -13,6 +13,7 @@
 # limitations under the License.
 
 """Provides functionality for testing implementations of plugins"""
+# pylint: disable=missing-function-docstring,missing-class-docstring,protected-access,invalid-name,no-self-use,no-method-argument,import-outside-toplevel
 import unittest
 from typing import Optional
 
@@ -54,7 +55,7 @@ class TestPlugin(unittest.TestCase):
         if self.plugin is None:
             return
 
-        cs = settings.getMasterCs()
+        cs = settings.Settings()
         results = self.plugin.exposeInterfaces(cs)
         if results is None or not results:
             return

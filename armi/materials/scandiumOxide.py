@@ -14,8 +14,8 @@
 
 """Scandium Oxide"""
 
-from armi.utils.units import getTk
 from armi.materials.material import Material
+from armi.utils.units import getTk
 
 
 class Sc2O3(Material):
@@ -23,12 +23,16 @@ class Sc2O3(Material):
 
     propertyValidTemperature = {"linear expansion percent": ((273.15, 1573.15), "K")}
 
+    def __init__(self):
+        Material.__init__(self)
+        """
+        https://en.wikipedia.org/wiki/Scandium_oxide
+        """
+        self.refDens = 3.86
+
     def setDefaultMassFracs(self):
         self.setMassFrac("SC45", 0.6520)
         self.setMassFrac("O16", 0.3480)
-
-    def density(self, Tk=None, Tc=None):
-        return 3.86
 
     def linearExpansionPercent(self, Tk=None, Tc=None):
         """

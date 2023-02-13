@@ -26,12 +26,18 @@ class OperatorSnapshots(operatorMPI.OperatorMPI):
     This operator can be run as a restart, adding new physics to a previous run.
     """
 
-    def createInterfaces(self):
-        operatorMPI.OperatorMPI.createInterfaces(self)
+    def __init__(self, cs):
+        super().__init__(cs)
+
         # disable fuel management and optimization
         # disable depletion because we don't want to change number densities for tn's >0 (or any)
-        for toDisable in ["fuelHandler", "optimize", "depletion"]:
-            i = self.getInterface(toDisable)
+        self.disabledInterfaces = ["depletion", "fuelHandler", "optimize"]
+
+    def createInterfaces(self):
+        operatorMPI.OperatorMPI.createInterfaces(self)
+
+        for toDisable in self.disabledInterfaces:
+            i = self.getInterface(name=toDisable, function=toDisable)
             if i:
                 i.enabled(False)
 
@@ -63,6 +69,11 @@ class OperatorSnapshots(operatorMPI.OperatorMPI):
                 "Beginning snapshot ({0:02d}, {1:02d})".format(ssCycle, ssNode)
             )
             dbi.loadState(ssCycle, ssNode)
+
+            # need to update reactor power after the database load
+            # this is normally handled in operator._cycleLoop
+            self.r.core.p.power = self.cs["power"]
+
             halt = self.interactAllBOC(self.r.p.cycle)
             if halt:
                 break
@@ -71,6 +82,7 @@ class OperatorSnapshots(operatorMPI.OperatorMPI):
             self.interactAllEveryNode(
                 ssCycle, ssNode, excludedInterfaceNames=("database",)
             )
+            self._performTightCoupling(ssCycle, ssNode, writeDB=False)
 
             # database is excluded at last snapshot since it writes at EOL
             exclude = ("database",) if (ssCycle, ssNode) == lastTimeStep else ()

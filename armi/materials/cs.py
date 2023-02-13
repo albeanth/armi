@@ -16,11 +16,11 @@
 Cesium
 """
 
-from armi.materials.material import Material
+from armi.materials.material import Fluid
 from armi.utils.units import getTk
 
 
-class Cs(Material):
+class Cs(Fluid):
 
     name = "Cesium"
 
@@ -28,8 +28,13 @@ class Cs(Material):
         self.setMassFrac("CS133", 1.0)
 
     def density(self, Tk=None, Tc=None):
-        """
+        """The 2D/3D density of liquid Cesium.
+
         https://en.wikipedia.org/wiki/Caesium
+
+        Notes
+        -----
+        In ARMI, we define density() and density3() as the same for Fluids.
         """
         Tk = getTk(Tc, Tk)
         if Tk < self.meltingPoint():

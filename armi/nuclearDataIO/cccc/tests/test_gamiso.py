@@ -13,7 +13,7 @@
 # limitations under the License.
 
 """Test GAMISO reading and writing"""
-
+# pylint: disable=missing-function-docstring,missing-class-docstring,protected-access,invalid-name,no-self-use,no-method-argument,import-outside-toplevel
 from copy import deepcopy
 import os
 import unittest
@@ -24,7 +24,7 @@ from armi.nuclearDataIO.xsNuclides import XSNuclide
 
 THIS_DIR = os.path.dirname(__file__)
 FIXTURE_DIR = os.path.join(THIS_DIR, "..", "..", "tests", "fixtures")
-GAMISO_AA = os.path.join(FIXTURE_DIR, "mc2v3-AA.gamiso")
+GAMISO_AA = os.path.join(FIXTURE_DIR, "AA.GAMISO")
 
 
 class TestGamiso(unittest.TestCase):

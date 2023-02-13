@@ -40,7 +40,7 @@ class NuclideTests(unittest.TestCase):
         nuc = nuclideBases.byName["U238"]
         self.assertFalse(hasattr(nuc, "xsId"))
         nrAA = xsNuclides.XSNuclide(None, "U238AA")
-        nrAA.isotxsMetadata["nuclideId"] = nuc.mc2id
+        nrAA.isotxsMetadata["nuclideId"] = nuc.name
         nrAA.updateBaseNuclide()
         self.assertEqual("AA", nrAA.xsId)
         self.assertFalse(hasattr(nuc, "xsId"))
@@ -50,7 +50,7 @@ class NuclideTests(unittest.TestCase):
         nuc = nuclideBases.byName["FE"]
         nrAA = xsNuclides.XSNuclide(lib, "FEAA")
         lib["FEAA"] = nrAA
-        nrAA.isotxsMetadata["nuclideId"] = nuc.mc2id
+        nrAA.isotxsMetadata["nuclideId"] = nuc.name
         nrAA.updateBaseNuclide()
         self.assertEqual(len(nuc.trans), len(nrAA.trans))
         nuc.trans.append("whatever")
@@ -62,30 +62,30 @@ class NuclideTests(unittest.TestCase):
 
     def test_nuclide_newLabelsDontCauseWarnings(self):
         with mockRunLogs.BufferLog() as logCapture:
-            self.assertEqual("", logCapture._outputStream)
+            self.assertEqual("", logCapture.getStdout())
             fe = nuclideBases.byName["FE"]
             feNuc = xsNuclides.XSNuclide(None, "FEAA")
-            feNuc.isotxsMetadata["nuclideId"] = fe.getMcc3Id()
+            feNuc.isotxsMetadata["nuclideId"] = fe.name
             feNuc.updateBaseNuclide()
             self.assertEqual(fe, feNuc._base)
-            self.assertEqual("", logCapture._outputStream)
+            self.assertEqual("", logCapture.getStdout())
 
     def test_nuclide_oldLabelsCauseWarnings(self):
         with mockRunLogs.BufferLog() as logCapture:
-            self.assertEqual("", logCapture._outputStream)
+            self.assertEqual("", logCapture.getStdout())
             pu = nuclideBases.byName["PU239"]
             puNuc = xsNuclides.XSNuclide(None, "PLUTAA")
-            puNuc.isotxsMetadata["nuclideId"] = pu.mc2id
+            puNuc.isotxsMetadata["nuclideId"] = pu.name
             puNuc.updateBaseNuclide()
             self.assertEqual(pu, puNuc._base)
-            length = len(logCapture._outputStream)
+            length = len(logCapture.getStdout())
             self.assertGreater(length, 15)
             # now get it with a legitmate same label, length shouldn't change
             puNuc = xsNuclides.XSNuclide(None, "PLUTAB")
-            puNuc.isotxsMetadata["nuclideId"] = pu.mc2id
+            puNuc.isotxsMetadata["nuclideId"] = pu.name
             puNuc.updateBaseNuclide()
             self.assertEqual(pu, puNuc._base)
-            self.assertEqual(length, len(logCapture._outputStream))
+            self.assertEqual(length, len(logCapture.getStdout()))
 
     def test_nuclide_nuclideBaseMethodsShouldNotFail(self):
         for nuc in self.lib.nuclides:

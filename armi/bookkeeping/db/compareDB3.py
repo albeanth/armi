@@ -164,6 +164,7 @@ def compareDatabases(
     srcFileName: str,
     exclusions: Optional[Sequence[str]] = None,
     tolerance: float = 0.0,
+    timestepCompare: Optional[Sequence[Tuple[int, int]]] = None,
 ) -> Optional[DiffResults]:
     """High-level method to compare two ARMI H5 files, given file paths."""
     compiledExclusions = None
@@ -185,21 +186,24 @@ def compareDatabases(
             )
 
         with ref, src:
-            _, nDiff = _compareH5Groups(out, ref, src, "timesteps")
+            if not timestepCompare:
+                _, nDiff = _compareH5Groups(out, ref, src, "timesteps")
 
-            if nDiff > 0:
-                runLog.warning(
-                    "{} and {} have differing timestep groups, and are "
-                    "probably not safe to compare. This is likely due to one of "
-                    "the cases having failed to complete.".format(ref, src)
-                )
-                return None
+                if nDiff > 0:
+                    runLog.warning(
+                        "{} and {} have differing timestep groups, and are "
+                        "probably not safe to compare. This is likely due to one of "
+                        "the cases having failed to complete.".format(ref, src)
+                    )
+                    return None
 
             for refGroup, srcGroup in zip(
-                ref.genTimeStepGroups(), src.genTimeStepGroups()
+                ref.genTimeStepGroups(timeSteps=timestepCompare),
+                src.genTimeStepGroups(timeSteps=timestepCompare),
             ):
                 runLog.info(
-                    "Comparing time step {}".format(refGroup.name.split("/")[1])
+                    f"Comparing ref time step {refGroup.name.split('/')[1]} to src time "
+                    f"step {srcGroup.name.split('/')[1]}"
                 )
                 diffResults.addTimeStep(refGroup.name)
                 _compareTimeStep(
@@ -289,17 +293,14 @@ def _compareSets(
     src: set, ref: set, out: OutputWriter, name: Optional[str] = None
 ) -> int:
     nDiffs = 0
+    printName = "" if name is None else name + " "
     if ref - src:
         nDiffs += len(ref - src)
-        out.writeln(
-            "ref has {}not in src: {}".format(name + " " or "", list(ref - src))
-        )
+        out.writeln("ref has {}not in src: {}".format(printName, list(ref - src)))
 
     if src - ref:
-        nDiffs += len(ref - src)
-        out.writeln(
-            "src has {}not in ref: {}".format(name + " " or "", list(src - ref))
-        )
+        nDiffs += len(src - ref)
+        out.writeln("src has {}not in ref: {}".format(printName, list(src - ref)))
 
     return nDiffs
 
@@ -493,8 +494,10 @@ def _compareComponentData(
 
         if srcSpecial ^ refSpecial:
             out.writeln(
-                "Could not compare data because one uses special formatting, "
-                "and the other does not. Ref: {} Src: {}".format(refSpecial, srcSpecial)
+                "Could not compare data for parameter {} because one uses special "
+                "formatting, and the other does not. Ref: {} Src: {}".format(
+                    paramName, refSpecial, srcSpecial
+                )
             )
             diffResults.addDiff(
                 refGroup.name, paramName, numpy.inf, numpy.inf, numpy.inf

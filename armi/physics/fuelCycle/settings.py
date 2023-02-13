@@ -18,17 +18,17 @@ import os
 from armi.settings import setting
 from armi.operators import settingsValidation
 
-CONF_ASSEMBLY_ROTATION_ALG = "assemblyRotationAlgorithm"
 CONF_ASSEM_ROTATION_STATIONARY = "assemblyRotationStationary"
+CONF_ASSEMBLY_ROTATION_ALG = "assemblyRotationAlgorithm"
 CONF_CIRCULAR_RING_MODE = "circularRingMode"
 CONF_CIRCULAR_RING_ORDER = "circularRingOrder"
 CONF_CUSTOM_FUEL_MANAGEMENT_INDEX = "customFuelManagementIndex"
-CONF_RUN_LATTICE_BEFORE_SHUFFLING = "runLatticePhysicsBeforeShuffling"
-CONF_SHUFFLE_LOGIC = "shuffleLogic"
-CONF_PLOT_SHUFFLE_ARROWS = "plotShuffleArrows"
 CONF_FUEL_HANDLER_NAME = "fuelHandlerName"
 CONF_JUMP_RING_NUM = "jumpRingNum"
 CONF_LEVELS_PER_CASCADE = "levelsPerCascade"
+CONF_PLOT_SHUFFLE_ARROWS = "plotShuffleArrows"
+CONF_RUN_LATTICE_BEFORE_SHUFFLING = "runLatticePhysicsBeforeShuffling"
+CONF_SHUFFLE_LOGIC = "shuffleLogic"
 
 
 def getFuelCycleSettings():
@@ -130,8 +130,8 @@ def getFuelCycleSettingValidators(inspector):
 
     queries.append(
         settingsValidation.Query(
-            lambda: bool(inspector.cs["shuffleLogic"])
-            ^ bool(inspector.cs["fuelHandlerName"]),
+            lambda: bool(inspector.cs[CONF_SHUFFLE_LOGIC])
+            ^ bool(inspector.cs[CONF_FUEL_HANDLER_NAME]),
             "A value was provided for `fuelHandlerName` or `shuffleLogic`, but not "
             "the other. Either both `fuelHandlerName` and `shuffleLogic` should be "
             "defined, or neither of them.",
@@ -177,7 +177,7 @@ def getFuelCycleSettingValidators(inspector):
     ]
 
     def _locateRegexOccurences():
-        with open(inspector._csRelativePath(inspector.cs["shuffleLogic"])) as src:
+        with open(inspector._csRelativePath(inspector.cs[CONF_SHUFFLE_LOGIC])) as src:
             src = src.read()
             matches = []
             for pattern, _sub in regex_solutions:
@@ -185,7 +185,7 @@ def getFuelCycleSettingValidators(inspector):
             return matches
 
     def _applyRegexSolutions():
-        srcFile = inspector._csRelativePath(inspector.cs["shuffleLogic"])
+        srcFile = inspector._csRelativePath(inspector.cs[CONF_SHUFFLE_LOGIC])
         destFile = os.path.splitext(srcFile)[0] + "migrated.py"
         with open(srcFile) as src, open(destFile, "w") as dest:
             srcContent = src.read()  # get the buffer content
@@ -198,28 +198,28 @@ def getFuelCycleSettingValidators(inspector):
                 dest.write("from armi import runLog\n")
             dest.write(regexContent)
 
-        inspector.cs = inspector.cs.modified(newSettings={"shuffleLogic": destFile})
+        inspector.cs = inspector.cs.modified(newSettings={CONF_SHUFFLE_LOGIC: destFile})
 
     queries.append(
         settingsValidation.Query(
-            lambda: " " in inspector.cs["shuffleLogic"],
+            lambda: " " in inspector.cs[CONF_SHUFFLE_LOGIC],
             "Spaces are not allowed in shuffleLogic file location. You have specified {0}. "
-            "Shuffling will not occur.".format(inspector.cs["shuffleLogic"]),
+            "Shuffling will not occur.".format(inspector.cs[CONF_SHUFFLE_LOGIC]),
             "",
             inspector.NO_ACTION,
         )
     )
 
     def _clearShufflingInput():
-        inspector._assignCS("shuffleLogic", "")
-        inspector._assignCS("fuelHandlerName", "")
+        inspector._assignCS(CONF_SHUFFLE_LOGIC, "")
+        inspector._assignCS(CONF_FUEL_HANDLER_NAME, "")
 
     queries.append(
         settingsValidation.Query(
-            lambda: inspector.cs["shuffleLogic"]
-            and not inspector._csRelativePathExists(inspector.cs["shuffleLogic"]),
+            lambda: inspector.cs[CONF_SHUFFLE_LOGIC]
+            and not inspector._csRelativePathExists(inspector.cs[CONF_SHUFFLE_LOGIC]),
             "The specified shuffle logic file '{0}' cannot be found. "
-            "Shuffling will not occur.".format(inspector.cs["shuffleLogic"]),
+            "Shuffling will not occur.".format(inspector.cs[CONF_SHUFFLE_LOGIC]),
             "Clear specified file value?",
             _clearShufflingInput,
         )
@@ -227,13 +227,13 @@ def getFuelCycleSettingValidators(inspector):
 
     queries.append(
         settingsValidation.Query(
-            lambda: inspector.cs["shuffleLogic"]
-            and inspector._csRelativePathExists(inspector.cs["shuffleLogic"])
+            lambda: inspector.cs[CONF_SHUFFLE_LOGIC]
+            and inspector._csRelativePathExists(inspector.cs[CONF_SHUFFLE_LOGIC])
             and _locateRegexOccurences(),
             "The shuffle logic file {} uses deprecated code."
             " It will not work unless you permit some automated changes to occur."
             " The logic file will be backed up to the current directory under a timestamped name"
-            "".format(inspector.cs["shuffleLogic"]),
+            "".format(inspector.cs[CONF_SHUFFLE_LOGIC]),
             "Proceed?",
             _applyRegexSolutions,
         )

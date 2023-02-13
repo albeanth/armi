@@ -31,13 +31,22 @@ class ThU(material.Material):
     enrichedNuclide = "U233"
     propertyValidTemperature = {"linear expansion": ((30, 600), "K")}
 
+    def __init__(self):
+        material.Material.__init__(self)
+        """g/cc from IAEA TE 1450"""
+        self.refDens = 11.68
+
     def getEnrichment(self):
         return self.getMassFrac("U233") / (
             self.getMassFrac("U233") + self.getMassFrac("TH232")
         )
 
     def applyInputParams(self, U233_wt_frac=None, *args, **kwargs):
-        runLog.warning("Material {} has not yet been tested for accuracy".format("ThU"))
+        runLog.warning(
+            "Material {} has not yet been tested for accuracy".format("ThU"),
+            single=True,
+            label="ThU applyInputParams",
+        )
 
         if U233_wt_frac is not None:
             self.adjustMassEnrichment(U233_wt_frac)
@@ -46,10 +55,6 @@ class ThU(material.Material):
     def setDefaultMassFracs(self):
         self.setMassFrac("TH232", 1.0)
         self.setMassFrac("U233", 0.0)
-
-    def density(self, Tk=None, Tc=None):
-        """g/cc from IAEA TE 1450"""
-        return 11.68
 
     def linearExpansion(self, Tk=None, Tc=None):
         r"""m/m/K from IAEA TE 1450"""

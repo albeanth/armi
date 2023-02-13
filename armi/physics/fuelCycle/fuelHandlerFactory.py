@@ -13,9 +13,10 @@
 # limitations under the License.
 
 """factory for the FuelHandler"""
-from armi.operators import RunTypes
-from armi.utils import directoryChangers, pathTools
 from armi.physics.fuelCycle import fuelHandlers
+from armi.physics.fuelCycle.settings import CONF_FUEL_HANDLER_NAME
+from armi.physics.fuelCycle.settings import CONF_SHUFFLE_LOGIC
+from armi.utils import directoryChangers, pathTools
 
 
 def fuelHandlerFactory(operator):
@@ -27,22 +28,14 @@ def fuelHandlerFactory(operator):
     called again to instantiate a new FuelHandler.
     """
     cs = operator.cs
-    fuelHandlerClassName = cs["fuelHandlerName"]
-    fuelHandlerModulePath = cs["shuffleLogic"]
+    fuelHandlerClassName = cs[CONF_FUEL_HANDLER_NAME]
+    fuelHandlerModulePath = cs[CONF_SHUFFLE_LOGIC]
 
     if not fuelHandlerClassName:
-        # User did not request a custom fuel handler.
-        # This is code coupling that should be untangled.
-        # Special case for equilibrium-mode shuffling
-        if cs["eqDirect"] and cs["runType"].lower() == RunTypes.STANDARD.lower():
-            from terrapower.physics.neutronics.equilibrium import fuelHandler as efh
-
-            return efh.EqDirectFuelHandler(operator)
-        else:
-            # give the default FuelHandler. This does not have an implemented outage, but
-            # still offers moving capabilities. Useful when you just need to make explicit
-            # moves but do not have a fully-defined fuel management input.
-            return fuelHandlers.FuelHandler(operator)
+        # give the default FuelHandler. This does not have an implemented outage, but
+        # still offers moving capabilities. Useful when you just need to make explicit
+        # moves but do not have a fully-defined fuel management input.
+        return fuelHandlers.FuelHandler(operator)
 
     # User did request a custom fuel handler. We must go find and import it
     # from the input directory.
@@ -82,4 +75,5 @@ def fuelHandlerFactory(operator):
                     fuelHandlerModulePath, fuelHandlerClassName, cs.inputDirectory
                 )
             )
+
     return fuelHandler

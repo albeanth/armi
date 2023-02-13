@@ -23,6 +23,7 @@ import numpy
 from numpy.testing import assert_allclose
 
 from armi import materials, runLog, settings, tests
+from armi.reactor.components import basicShapes, complexShapes
 from armi.nucDirectory import nucDir, nuclideBases
 from armi.nuclearDataIO.cccc import isotxs
 from armi.physics.neutronics import NEUTRON, GAMMA
@@ -32,6 +33,8 @@ from armi.reactor.tests.test_assemblies import makeTestAssembly
 from armi.tests import ISOAA_PATH, TEST_ROOT
 from armi.utils import hexagon, units
 from armi.utils.units import MOLES_PER_CC_TO_ATOMS_PER_BARN_CM
+
+NUM_PINS_IN_TEST_BLOCK = 217
 
 
 def buildSimpleFuelBlock():
@@ -79,7 +82,7 @@ def loadTestBlock(cold=True):
     assemNum = 3
     block = blocks.HexBlock("TestHexBlock")
     block.setType("defaultType")
-    block.p.nPins = 217
+    block.p.nPins = NUM_PINS_IN_TEST_BLOCK
     assembly = makeTestAssembly(assemNum, 1, r=r)
 
     # NOTE: temperatures are supposed to be in C
@@ -93,7 +96,7 @@ def loadTestBlock(cold=True):
         "Thot": hotTempFuel,
         "od": 0.84,
         "id": 0.6,
-        "mult": 217.0,
+        "mult": NUM_PINS_IN_TEST_BLOCK,
     }
     fuel = components.Circle("fuel", "UZr", **fuelDims)
 
@@ -102,7 +105,7 @@ def loadTestBlock(cold=True):
         "Thot": hotTempCoolant,
         "od": "fuel.id",
         "id": 0.3,
-        "mult": 217.0,
+        "mult": NUM_PINS_IN_TEST_BLOCK,
     }
     bondDims["components"] = {"fuel": fuel}
     bond = components.Circle("bond", "Sodium", **bondDims)
@@ -112,7 +115,7 @@ def loadTestBlock(cold=True):
         "Thot": hotTempStructure,
         "od": "bond.id",
         "id": 0.0,
-        "mult": 217.0,
+        "mult": NUM_PINS_IN_TEST_BLOCK,
     }
     annularVoidDims["components"] = {"bond": bond}
     annularVoid = components.Circle("annular void", "Void", **annularVoidDims)
@@ -122,7 +125,7 @@ def loadTestBlock(cold=True):
         "Thot": hotTempStructure,
         "od": 0.90,
         "id": 0.85,
-        "mult": 217.0,
+        "mult": NUM_PINS_IN_TEST_BLOCK,
     }
     innerLiner = components.Circle("inner liner", "Graphite", **innerLinerDims)
 
@@ -131,7 +134,7 @@ def loadTestBlock(cold=True):
         "Thot": hotTempStructure,
         "od": "inner liner.id",
         "id": "fuel.od",
-        "mult": 217.0,
+        "mult": NUM_PINS_IN_TEST_BLOCK,
     }
     fuelLinerGapDims["components"] = {"inner liner": innerLiner, "fuel": fuel}
     fuelLinerGap = components.Circle("gap1", "Void", **fuelLinerGapDims)
@@ -141,7 +144,7 @@ def loadTestBlock(cold=True):
         "Thot": hotTempStructure,
         "od": 0.95,
         "id": 0.90,
-        "mult": 217.0,
+        "mult": NUM_PINS_IN_TEST_BLOCK,
     }
     outerLiner = components.Circle("outer liner", "HT9", **outerLinerDims)
 
@@ -150,7 +153,7 @@ def loadTestBlock(cold=True):
         "Thot": hotTempStructure,
         "od": "outer liner.id",
         "id": "inner liner.od",
-        "mult": 217.0,
+        "mult": NUM_PINS_IN_TEST_BLOCK,
     }
     linerLinerGapDims["components"] = {
         "outer liner": outerLiner,
@@ -163,7 +166,7 @@ def loadTestBlock(cold=True):
         "Thot": hotTempStructure,
         "od": 1.05,
         "id": 0.95,
-        "mult": 217.0,
+        "mult": NUM_PINS_IN_TEST_BLOCK,
     }
     cladding = components.Circle("clad", "HT9", **claddingDims)
 
@@ -172,7 +175,7 @@ def loadTestBlock(cold=True):
         "Thot": hotTempStructure,
         "od": "clad.id",
         "id": "outer liner.od",
-        "mult": 217.0,
+        "mult": NUM_PINS_IN_TEST_BLOCK,
     }
     linerCladGapDims["components"] = {"clad": cladding, "outer liner": outerLiner}
     linerCladGap = components.Circle("gap3", "Void", **linerCladGapDims)
@@ -184,7 +187,7 @@ def loadTestBlock(cold=True):
         "id": 0.0,
         "axialPitch": 30.0,
         "helixDiameter": 1.1,
-        "mult": 217.0,
+        "mult": NUM_PINS_IN_TEST_BLOCK,
     }
     wire = components.Helix("wire", "HT9", **wireDims)
 
@@ -229,6 +232,7 @@ def loadTestBlock(cold=True):
 
     block.setHeight(16.0)
 
+    block.autoCreateSpatialGrids()
     assembly.add(block)
     r.core.add(assembly)
     return block
@@ -405,7 +409,7 @@ class Block_TestCase(unittest.TestCase):
         self.assertFalse(self.block.hasFlags(Flags.IGNITER | Flags.FUEL))
 
     def test_duplicate(self):
-        Block2 = copy.deepcopy(self.block)
+        Block2 = blocks.Block._createHomogenizedCopy(self.block)
         originalComponents = self.block.getComponents()
         newComponents = Block2.getComponents()
         for c1, c2 in zip(originalComponents, newComponents):
@@ -439,8 +443,58 @@ class Block_TestCase(unittest.TestCase):
         places = 6
         self.assertAlmostEqual(ref, cur, places=places)
 
+        self.assertEqual(self.block.p.flags, Block2.p.flags)
+
+    def test_homogenizedMixture(self):
+        args = [False, True]  # pinSpatialLocator argument
+        expectedShapes = [
+            [basicShapes.Hexagon],
+            [basicShapes.Hexagon, basicShapes.Circle],
+        ]
+
+        for arg, shapes in zip(args, expectedShapes):
+            homogBlock = self.block._createHomogenizedCopy(pinSpatialLocators=arg)
+            for shapeType in shapes:
+                for c in homogBlock.getComponents():
+                    if isinstance(c, shapeType):
+                        print(c)
+                        break
+                else:
+                    # didn't find the homogenized hex in the block copy
+                    self.assertTrue(
+                        False, f"{self.block} does not have a {shapeType} component!"
+                    )
+            if arg:
+                # check that homogenized block has correct pin coordinates
+                self.assertEqual(self.block.getNumPins(), homogBlock.getNumPins())
+                self.assertEqual(self.block.p.nPins, homogBlock.p.nPins)
+                pinCoords = self.block.getPinCoordinates()
+                homogPinCoords = homogBlock.getPinCoordinates()
+                for refXYZ, homogXYZ in zip(list(pinCoords), list(homogPinCoords)):
+                    self.assertListEqual(list(refXYZ), list(homogXYZ))
+
+            cur = homogBlock.getMass()
+            self.assertAlmostEqual(self.block.getMass(), homogBlock.getMass())
+
+            self.assertEqual(homogBlock.getType(), self.block.getType())
+            self.assertEqual(homogBlock.p.flags, self.block.p.flags)
+            self.assertEqual(homogBlock.macros, self.block.macros)
+            self.assertEqual(
+                homogBlock._lumpedFissionProducts, self.block._lumpedFissionProducts
+            )
+
+            ref = self.block.getArea()
+            cur = homogBlock.getArea()
+            places = 6
+            self.assertAlmostEqual(ref, cur, places=places)
+
+            ref = self.block.getHeight()
+            cur = homogBlock.getHeight()
+            places = 6
+            self.assertAlmostEqual(ref, cur, places=places)
+
     def test_getXsType(self):
-        self.cs = settings.getMasterCs()
+        self.cs = settings.Settings()
         newSettings = {"loadingFile": os.path.join(TEST_ROOT, "refSmallReactor.yaml")}
         self.cs = self.cs.modified(newSettings=newSettings)
 
@@ -713,8 +767,10 @@ class Block_TestCase(unittest.TestCase):
         cur = self.block.getWettedPerimeter()
         ref = math.pi * (
             self.block.getDim(Flags.CLAD, "od") + self.block.getDim(Flags.WIRE, "od")
-        ) + 6 * self.block.getDim(Flags.DUCT, "ip") / math.sqrt(3) / self.block.getDim(
-            Flags.CLAD, "mult"
+        ) * self.block.getDim(Flags.CLAD, "mult") + 6 * self.block.getDim(
+            Flags.DUCT, "ip"
+        ) / math.sqrt(
+            3
         )
         self.assertAlmostEqual(cur, ref)
 
@@ -725,9 +781,15 @@ class Block_TestCase(unittest.TestCase):
         ref = area / nPins
         self.assertAlmostEqual(cur, ref)
 
+    def test_getFlowArea(self):
+        area = self.block.getComponent(Flags.COOLANT).getArea()
+        cur = self.block.getFlowArea()
+        ref = area
+        self.assertAlmostEqual(cur, ref)
+
     def test_getHydraulicDiameter(self):
         cur = self.block.getHydraulicDiameter()
-        ref = 4.0 * self.block.getFlowAreaPerPin() / self.block.getWettedPerimeter()
+        ref = 4.0 * self.block.getFlowArea() / self.block.getWettedPerimeter()
         self.assertAlmostEqual(cur, ref)
 
     def test_adjustUEnrich(self):
@@ -859,6 +921,20 @@ class Block_TestCase(unittest.TestCase):
         self.assertAlmostEqual(cur, ref, places=places)
         self.block.remove(self.fuelComponent)
 
+    def test_getMicroSuffix(self):
+        self.assertEqual(self.block.getMicroSuffix(), "AA")
+
+        self.block.p.xsType = "Z"
+        self.assertEqual(self.block.getMicroSuffix(), "ZA")
+
+        self.block.p.xsType = "RS"
+        self.assertEqual(self.block.getMicroSuffix(), "RS")
+
+        self.block.p.buGroup = "X"
+        self.block.p.xsType = "AB"
+        with self.assertRaises(ValueError):
+            self.block.getMicroSuffix()
+
     def test_getUraniumMassEnrich(self):
         self.block.adjustUEnrich(0.25)
 
@@ -906,7 +982,7 @@ class Block_TestCase(unittest.TestCase):
         )
         self.assertAlmostEqual(moles, refMoles)
 
-    def test_getPuN(self):
+    def test_getPu(self):
         fuel = self.block.getComponent(Flags.FUEL)
         vFrac = fuel.getVolumeFraction()
         refDict = {
@@ -922,31 +998,32 @@ class Block_TestCase(unittest.TestCase):
         }
         fuel.setNumberDensities({nuc: v / vFrac for nuc, v in refDict.items()})
 
+        # test number density
         cur = self.block.getPuN()
-
         ndens = 0.0
         for nucName in refDict.keys():
             if nucName in ["PU238", "PU239", "PU240", "PU241", "PU242"]:
                 ndens += self.block.getNumberDensity(nucName)
         ref = ndens
-
         places = 6
         self.assertAlmostEqual(cur, ref, places=places)
 
-    def test_getPuMass(self):
-        fuel = self.block.getComponent(Flags.FUEL)
-        refDict = {
-            "AM241": 2.695633500634074e-05,
-            "U238": 0.015278429635341755,
-            "O16": 0.04829586365251901,
-            "U235": 0.004619446966056436,
-            "PU239": 0.0032640382635406515,
-            "PU238": 4.266845903720035e-06,
-            "PU240": 0.000813669265183342,
-            "PU241": 0.00011209296581262849,
-            "PU242": 2.3078961257395204e-05,
-        }
-        fuel.setNumberDensities(refDict)
+        # test moles
+        cur = self.block.getPuMoles()
+        ndens = 0.0
+        for nucName in refDict.keys():
+            if nucName in ["PU238", "PU239", "PU240", "PU241", "PU242"]:
+                ndens += self.block.getNumberDensity(nucName)
+        ref = (
+            ndens
+            / units.MOLES_PER_CC_TO_ATOMS_PER_BARN_CM
+            * self.block.getVolume()
+            * self.block.getSymmetryFactor()
+        )
+        places = 6
+        self.assertAlmostEqual(cur, ref, places=places)
+
+        # test mass
         cur = self.block.getPuMass()
         pu = 0.0
         for nucName in refDict.keys():
@@ -1166,6 +1243,23 @@ class Block_TestCase(unittest.TestCase):
 
         emptyBlock = blocks.HexBlock("empty")
         self.assertEqual(emptyBlock.getNumPins(), 0)
+
+        holedRectangle = complexShapes.HoledRectangle(
+            "holedRectangle", "HT9", 1, 1, 0.5, 1.0, 1.0
+        )
+        holedRectangle.setType("component", flags=Flags.CONTROL)
+        emptyBlock.add(holedRectangle)
+        self.assertEqual(emptyBlock.getNumPins(), 0)
+
+        hexagon = basicShapes.Hexagon("hexagon", "HT9", 1, 1, 1)
+        hexagon.setType("component", flags=Flags.SHIELD)
+        emptyBlock.add(hexagon)
+        self.assertEqual(emptyBlock.getNumPins(), 0)
+
+        pins = basicShapes.Circle("circle", "HT9", 1, 1, 1, 0, 8)
+        pins.setType("component", flags=Flags.PLENUM)
+        emptyBlock.add(pins)
+        self.assertEqual(emptyBlock.getNumPins(), 8)
 
     def test_setLinPowByPin(self):
         numPins = self.block.getNumPins()
@@ -1562,7 +1656,7 @@ class Block_TestCase(unittest.TestCase):
     def test_getReactionRates(self):
         block = blocks.HexBlock("HexBlock")
         block.setType("defaultType")
-        comp = components.basicShapes.Hexagon("hexagon", "MOX", 1, 1, 1)
+        comp = basicShapes.Hexagon("hexagon", "MOX", 1, 1, 1)
         block.add(comp)
         block.setHeight(1)
         block.p.xsType = "A"
@@ -1574,13 +1668,16 @@ class Block_TestCase(unittest.TestCase):
         r.core.lib = isotxs.readBinary(ISOAA_PATH)
         block.p.mgFlux = 1
 
-        self.assertEqual(
+        self.assertAlmostEqual(
             block.getReactionRates("PU239")["nG"],
             block.getNumberDensity("PU239") * sum(r.core.lib["PU39AA"].micros.nGamma),
         )
 
-        with self.assertRaises(KeyError):
-            block.getReactionRates("PU39")
+        # the key is invalid, so should get back all zeros
+        self.assertEqual(
+            block.getReactionRates("PU39"),
+            {"nG": 0, "nF": 0, "n2n": 0, "nA": 0, "nP": 0, "n3n": 0},
+        )
 
 
 class Test_NegativeVolume(unittest.TestCase):

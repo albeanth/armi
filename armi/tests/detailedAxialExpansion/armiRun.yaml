@@ -19,7 +19,7 @@ settings:
       numInternalRings: 1
       numExternalRings: 1
     XA:
-      fileLocation:
+      xsFileLocation:
         - ISOXA
   cycleLength: 2000.0
   db: false
@@ -37,11 +37,8 @@ settings:
   moduleVerbosity:
     armi.reactor.reactors: info
   nCycles: 6
-  numCoupledIterations: 0
   outputFileExtension: png
   power: 100000000.0
-  shuffleLogic: ../refSmallReactorShuffleLogic.py
   summarizeAssemDesign: false
   targetK: 1.002
   verbosity: extra
-  zoneFlowSummary: false

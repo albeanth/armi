@@ -28,8 +28,7 @@ which block is to be deemed **representative** of an entire set of blocks in a p
 Then the representative block is sent to a lattice physics kernel for actual physics
 calculations.
 
-Generally, the cross section manager is a attribute of the lattice physics code interface (e.g.
-the :py:mod:`~terrapower.physics.neutronics.mc2.mc2Interface`.
+Generally, the cross section manager is a attribute of the lattice physics code interface
 
 Examples
 --------
@@ -191,11 +190,7 @@ class BlockCollection(list):
         .. math::
              T = \frac{\sum{n_i v_i T_i}}{\sum{n_i v_i}}
 
-        where :math:`n_i` is a number density, :math:`v_i` is a volume, and :math:`T_i` is a temperature.
-
-        See Also
-        --------
-        terrapower.physics.neutronics.mc2.mc2Writers.Mc2Writer._getAllNuclideDensities : uses these values
+        where :math:`n_i` is a number density, :math:`v_i` is a volume, and :math:`T_i` is a temperature
         """
         self.avgNucTemperatures = {}
         nvt, nv = self._getNucTempHelper()
@@ -331,35 +326,11 @@ class AverageBlockCollection(BlockCollection):
         ndens = weights.dot([b.getNuclideNumberDensities(nuclides) for b in blocks])
         return dict(zip(nuclides, ndens))
 
-    def _getAverageFissionGasRemoved(self):
-        """
-        Get weighted average fission gas release fraction.
-
-        Notes
-        -----
-        - Will be applied to LFP composition.
-        """
-        totalWeight = 0.0
-        fgRelease = 0.0
-        for b in self.getCandidateBlocks():
-            weight = self.getWeight(b)
-            totalWeight += weight
-            fgRelease += b.p.gasReleaseFraction * weight
-        return fgRelease / totalWeight
-
     def _getAverageFuelLFP(self):
         """Compute the average lumped fission products."""
         # TODO: make do actual average of LFPs
         b = self.getCandidateBlocks()[0]
-        lfpCollection = b.getLumpedFissionProductCollection()
-        if lfpCollection:
-            lfpCollectionCopy = lfpCollection.duplicate()
-            fgRemoved = self._getAverageFissionGasRemoved()
-            lfpCollectionCopy.setGasRemovedFrac(fgRemoved)
-        else:
-            lfpCollectionCopy = lfpCollection
-
-        return lfpCollectionCopy
+        return b.getLumpedFissionProductCollection()
 
     def _getNucTempHelper(self):
         """All candidate blocks are used in the average."""
@@ -639,8 +610,26 @@ class CrossSectionGroupManager(interfaces.Interface):
         self.clearRepresentativeBlocks()
 
     def interactCoupled(self, iteration):
-        """Update XS groups on each physics coupling iteration to get latest temperatures."""
-        self.interactBOC(cycle=None)
+        """Update XS groups on each physics coupling iteration to get latest temperatures.
+
+        Notes
+        -----
+        This coupling iteration is limited to when the time node is equal to zero. This is
+        assumed to be reasonable for most applications as 1) microscopic cross section changes with burn-up
+        are deemed to be less significant compared to convergence on the temperature state, and 2) temperature
+        distributions are not expected to dramatically change for time steps > 0.
+
+        .. warning::
+
+            The latter assumptions are design and application-specific and a subclass should be
+            considered when violated.
+
+        See Also
+        --------
+        :py:meth:`Assembly <armi.physics.neutronics.latticePhysics.latticePhysics.LatticePhysicsInterface.interactCoupled>`
+        """
+        if self.r.p.timeNode == 0:
+            self.interactBOC(cycle=None)
 
     def clearRepresentativeBlocks(self):
         """Clear the representative blocks."""
@@ -725,8 +714,12 @@ class CrossSectionGroupManager(interfaces.Interface):
         return self.cs[CONF_CROSS_SECTION][xsID]
 
     def xsTypeIsPregenerated(self, xsID):
-        """Return True if the xs id is pre-generated."""
-        return self.cs[CONF_CROSS_SECTION][xsID].isPregenerated
+        """Return True if the cross sections for the given ``xsID`` is pre-generated."""
+        return self.cs[CONF_CROSS_SECTION][xsID].xsIsPregenerated
+
+    def fluxSolutionIsPregenerated(self, xsID):
+        """Return True if an external flux solution file for the given ``xsID`` is pre-generated."""
+        return self.cs[CONF_CROSS_SECTION][xsID].fluxIsPregenerated
 
     def _copyPregeneratedXSFile(self, xsID):
         # stop a race condition to copy files between all processors
@@ -740,11 +733,29 @@ class CrossSectionGroupManager(interfaces.Interface):
                     xsFileName, os.path.dirname(xsFileLocation), xsID
                 )
             )
-            shutil.copy(xsFileLocation, dest)
+            # Prevent copy error if the path and destination are the same.
+            if xsFileLocation != dest:
+                shutil.copy(xsFileLocation, dest)
+
+    def _copyPregeneratedFluxSolutionFile(self, xsID):
+        # stop a race condition to copy files between all processors
+        if context.MPI_RANK != 0:
+            return
+
+        fluxFileLocation, fluxFileName = self._getPregeneratedFluxFileLocationData(xsID)
+        dest = os.path.join(os.getcwd(), fluxFileName)
+        runLog.extra(
+            "Copying pre-generated flux solution file {} from {} for XS ID {}".format(
+                fluxFileName, os.path.dirname(fluxFileLocation), xsID
+            )
+        )
+        # Prevent copy error if the path and destination are the same.
+        if fluxFileLocation != dest:
+            shutil.copy(fluxFileLocation, dest)
 
     def _getPregeneratedXsFileLocationData(self, xsID):
         """
-        Gather the pregenerated cross section file data and check that the files exist.
+        Gather the pre-generated cross section file data and check that the files exist.
 
         Notes
         -----
@@ -752,7 +763,7 @@ class CrossSectionGroupManager(interfaces.Interface):
         and returns a list of tuples (file path, fileName).
         """
         fileData = []
-        filePaths = self.cs[CONF_CROSS_SECTION][xsID].fileLocation
+        filePaths = self.cs[CONF_CROSS_SECTION][xsID].xsFileLocation
         for filePath in filePaths:
             filePath = os.path.abspath(filePath)
             if not os.path.exists(filePath) or os.path.isdir(filePath):
@@ -764,6 +775,19 @@ class CrossSectionGroupManager(interfaces.Interface):
             fileName = os.path.basename(filePath)
             fileData.append((filePath, fileName))
         return fileData
+
+    def _getPregeneratedFluxFileLocationData(self, xsID):
+        """Gather the pre-generated flux solution file data and check that the files exist."""
+        filePath = self.cs[CONF_CROSS_SECTION][xsID].fluxFileLocation
+        filePath = os.path.abspath(filePath)
+        if not os.path.exists(filePath) or os.path.isdir(filePath):
+            raise ValueError(
+                "External cross section path for XS ID {} is not a valid file location {}".format(
+                    xsID, filePath
+                )
+            )
+        fileName = os.path.basename(filePath)
+        return (filePath, fileName)
 
     def createRepresentativeBlocks(self):
         """
@@ -781,6 +805,8 @@ class CrossSectionGroupManager(interfaces.Interface):
                 continue
             if numCandidateBlocks > 0:
                 runLog.debug("Creating representative block for {}".format(xsID))
+                if self.fluxSolutionIsPregenerated(xsID):
+                    self._copyPregeneratedFluxSolutionFile(xsID)
                 reprBlock = collection.createRepresentativeBlock()
                 representativeBlocks[xsID] = reprBlock
                 self.avgNucTemperatures[xsID] = collection.avgNucTemperatures
@@ -1017,15 +1043,9 @@ class CrossSectionGroupManager(interfaces.Interface):
                 xsIDGroup = self._getXsIDGroup(xsID)
                 if xsIDGroup == self._REPR_GROUP:
                     reprBlock = self.representativeBlocks.get(xsID)
-                    lfps = reprBlock.getLumpedFissionProductCollection()
-                    if lfps:
-                        fissionGasRemoved = list(lfps.values())[0].getGasRemovedFrac()
-                    else:
-                        fissionGasRemoved = 0.0
                     runLog.extra(
-                        "XS ID {} contains {:4d} blocks, represented by: {:65s}"
-                        " Fission Gas Removal Fraction: {:.2f}".format(
-                            xsID, len(blocks), reprBlock, fissionGasRemoved
+                        "XS ID {} contains {:4d} blocks, represented by: {:65s}".format(
+                            xsID, len(blocks), reprBlock
                         )
                     )
                 elif xsIDGroup == self._NON_REPR_GROUP:

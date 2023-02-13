@@ -11,11 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Tests for MPI actions"""
 # pylint: disable=missing-function-docstring,missing-class-docstring,abstract-method,protected-access
 
 import unittest
 
 from armi.mpiActions import (
+    _diagnosePickleError,
     DistributeStateAction,
     DistributionAction,
     MpiAction,
@@ -23,6 +25,7 @@ from armi.mpiActions import (
 )
 from armi import context
 from armi.reactor.tests import test_reactors
+from armi.tests import mockRunLogs
 from armi.tests import TEST_ROOT
 from armi.utils import iterables
 
@@ -38,6 +41,17 @@ class MpiIterTests(unittest.TestCase):
         """restore MPI rank and size on exit"""
         context.MPI_SIZE = self._mpiSize
         context.MPI_RANK = 0
+
+    def test_parallel(self):
+        self.action.serial = False
+        self.assertTrue(self.action.parallel)
+
+        self.action.serial = True
+        self.assertFalse(self.action.parallel)
+
+    def test_serialGather(self):
+        self.action.serial = True
+        self.assertEqual(len(self.action.gather()), 1)
 
     def test_mpiIter(self):
         allObjs = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
@@ -132,6 +146,27 @@ class MpiIterTests(unittest.TestCase):
         results = runActions(objs, r, o.cs, [act])
         self.assertEqual(len(results), 1)
         self.assertIsNone(results[0])
+
+    def test_diagnosePickleErrorTestReactor(self):
+        """Run _diagnosePickleError() on the test reactor.
+        We expect this to run all the way through the pickle diagnoser,
+        because the test reactor should be easily picklable.
+        """
+        o, _ = test_reactors.loadTestReactor(TEST_ROOT)
+
+        with mockRunLogs.BufferLog() as mock:
+            self.assertEqual("", mock.getStdout())
+
+            # Run the diagnosis on the test reactor
+            _diagnosePickleError(o)
+
+            # Hopefully, the test reactor can be pickled, and we get no errors
+            self.assertIn("Pickle Error Detection", mock.getStdout())
+            self.assertIn("Scanning the Reactor", mock.getStdout())
+            self.assertIn("Scanning all assemblies", mock.getStdout())
+            self.assertIn("Scanning all blocks", mock.getStdout())
+            self.assertIn("Scanning blocks by name", mock.getStdout())
+            self.assertIn("Scanning the ISOTXS library", mock.getStdout())
 
 
 def passer():

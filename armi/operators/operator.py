@@ -30,6 +30,7 @@ import os
 import re
 import shutil
 import time
+import collections
 
 from armi import context
 from armi import interfaces
@@ -39,6 +40,7 @@ from armi.bookkeeping import memoryProfiler
 from armi.bookkeeping.report import reportingUtils
 from armi.operators import settingsValidation
 from armi.operators.runTypes import RunTypes
+from armi.physics.fuelCycle.settings import CONF_SHUFFLE_LOGIC
 from armi.utils import codeTiming
 from armi.utils import (
     pathTools,
@@ -133,6 +135,7 @@ class Operator:  # pylint: disable=too-many-public-methods
         self._maxBurnSteps = None
         self._powerFractions = None
         self._availabilityFactors = None
+        self._convergenceSummary = None
 
         # Create the welcome headers for the case (case, input, machine, and some basic reactor information)
         reportingUtils.writeWelcomeHeaders(self, cs)
@@ -375,11 +378,35 @@ class Operator:  # pylint: disable=too-many-public-methods
         """Run the portion of the main loop that happens each subcycle."""
         self.r.p.timeNode = timeNode
         self.interactAllEveryNode(cycle, timeNode)
-        # perform tight coupling if requested
-        if self.cs["numCoupledIterations"]:
-            for coupledIteration in range(self.cs["numCoupledIterations"]):
+        self._performTightCoupling(cycle, timeNode)
+
+    def _performTightCoupling(self, cycle: int, timeNode: int, writeDB: bool = True):
+        """if requested, perform tight coupling and write out database
+
+        Notes
+        -----
+        writeDB is False for OperatorSnapshots as the DB gets written at EOL.
+        """
+        if not self.couplingIsActive():
+            # no coupling was requested
+            return
+        skipCycles = (int(val) for val in self.cs["cyclesSkipTightCouplingInteraction"])
+        if cycle in skipCycles:
+            runLog.warning(
+                f"interactAllCoupled disabled this cycle ({self.r.p.cycle}) due to "
+                "`cycleTreatTightConverged` setting."
+            )
+        else:
+            self._convergenceSummary = collections.defaultdict(list)
+            for coupledIteration in range(self.cs["tightCouplingMaxNumIters"]):
                 self.r.core.p.coupledIteration = coupledIteration + 1
-                self.interactAllCoupled(coupledIteration)
+                converged = self.interactAllCoupled(coupledIteration)
+                if converged:
+                    break
+        if writeDB:
+            # database has not yet been written, so we need to write it.
+            dbi = self.getInterface("database")
+            dbi.writeDBEveryNode(cycle, timeNode)
 
     def _interactAll(self, interactionName, activeInterfaces, *args):
         """
@@ -613,7 +640,41 @@ class Operator:  # pylint: disable=too-many-public-methods
         ARMI supports tight and loose coupling.
         """
         activeInterfaces = [ii for ii in self.interfaces if ii.enabled()]
+
+        # Store the previous iteration values before calling interactAllCoupled
+        # for each interface.
+        for interface in activeInterfaces:
+            if interface.coupler is not None:
+                interface.coupler.storePreviousIterationValue(
+                    interface.getTightCouplingValue()
+                )
+
         self._interactAll("Coupled", activeInterfaces, coupledIteration)
+
+        return self._checkTightCouplingConvergence(activeInterfaces)
+
+    def _checkTightCouplingConvergence(self, activeInterfaces: list):
+        """check if interfaces are converged
+
+        Parameters
+        ----------
+        activeInterfaces : list
+            the list of active interfaces on the operator
+
+        Notes
+        -----
+        This is split off from self.interactAllCoupled to accomodate testing"""
+        # Summarize the coupled results and the convergence status.
+        converged = []
+        for interface in activeInterfaces:
+            coupler = interface.coupler
+            if coupler is not None:
+                key = f"{interface.name}: {coupler.parameter}"
+                converged.append(coupler.isConverged(interface.getTightCouplingValue()))
+                self._convergenceSummary[key].append(coupler.eps)
+
+        reportingUtils.writeTightCouplingConvergenceSummary(self._convergenceSummary)
+        return all(converged)
 
     def interactAllError(self):
         """Interact when an error is raised by any other interface. Provides a wrap-up option on the way to a crash."""
@@ -644,6 +705,7 @@ class Operator:  # pylint: disable=too-many-public-methods
         armi.interfaces.getActiveInterfaceInfo : Collects the interface classes from relevant
             packages.
         """
+        runLog.header("=========== Creating Interfaces ===========")
         interfaceList = interfaces.getActiveInterfaceInfo(self.cs)
 
         for klass, kwargs in interfaceList:
@@ -904,25 +966,6 @@ class Operator:  # pylint: disable=too-many-public-methods
         for i in self.interfaces:
             i.attachReactor(self, self.r)
 
-    def dumpRestartData(self, cycle, time_, factorList):
-        """
-        Write some information about the cycle and shuffling to a auxiliary file for potential restarting.
-
-        Notes
-        -----
-        This is old and can be deprecated now that the database contains
-        the entire state. This was historically needed to have complete information regarding
-        shuffling when figuring out ideal fuel management operations.
-        """
-        if cycle >= len(self.restartData):
-            self.restartData.append((cycle, time_, factorList))
-        else:
-            # try to preserve loaded restartdata so we don't lose it in restarts.
-            self.restartData[cycle] = (cycle, time_, factorList)
-        with open(self.cs.caseTitle + ".restart.dat", "w") as restart:
-            for info in self.restartData:
-                restart.write("cycle=%d   time=%10.6E   factorList=%s\n" % info)
-
     def _loadRestartData(self):
         """
         Read a restart.dat file which contains all the fuel management factorLists and cycle lengths.
@@ -1030,7 +1073,9 @@ class Operator:  # pylint: disable=too-many-public-methods
         else:
             os.mkdir(newFolder)
 
-        # copy the cross section inputs
+        # Moving the cross section files is to a snapshot directory is a reasonable
+        # requirement, but these hard-coded names are not desirable. This is legacy
+        # and should be updated to be more robust for users.
         for fileName in os.listdir("."):
             if "mcc" in fileName and re.search(r"[A-Z]AF?\d?.inp", fileName):
                 base, ext = os.path.splitext(fileName)
@@ -1042,6 +1087,8 @@ class Operator:  # pylint: disable=too-many-public-methods
                         newFolder, "{0}_{1:03d}_{2:d}{3}".format(base, cycle, node, ext)
                     ),
                 )
+            if "rzmflx" in fileName:
+                pathTools.copyOrWarn("rzmflx for snapshot", fileName, newFolder)
 
         isoFName = "ISOTXS-c{0}".format(cycle)
         pathTools.copyOrWarn(
@@ -1053,7 +1100,7 @@ class Operator:  # pylint: disable=too-many-public-methods
             newFolder,
         )
         pathTools.copyOrWarn(
-            "Shuffle logic for snapshot", self.cs["shuffleLogic"], newFolder
+            "Shuffle logic for snapshot", self.cs[CONF_SHUFFLE_LOGIC], newFolder
         )
         pathTools.copyOrWarn(
             "Geometry file for snapshot", self.cs["geomFile"], newFolder
@@ -1079,4 +1126,4 @@ class Operator:  # pylint: disable=too-many-public-methods
 
     def couplingIsActive(self):
         """True if any kind of physics coupling is active."""
-        return self.cs["looseCoupling"] or self.cs["numCoupledIterations"] > 0
+        return self.cs["tightCoupling"]

@@ -60,7 +60,7 @@ found in [#touranarmi]_.
 
 Quick start
 -----------
-Before starting, you need to have `Python <https://www.python.org/downloads/>`_ 3.6+ on
+Before starting, you need to have `Python <https://www.python.org/downloads/>`_ 3.7+ on
 Windows or Linux.
 
 Get the ARMI code, install the prerequisites, and fire up the launcher with the following
@@ -403,7 +403,7 @@ The ARMI system is licensed as follows:
 
 .. code-block:: none
 
-	Copyright 2009-2022 TerraPower, LLC
+	Copyright 2009-2023 TerraPower, LLC
 
 	Licensed under the Apache License, Version 2.0 (the "License");
 	you may not use this file except in compliance with the License.
@@ -434,6 +434,6 @@ only use third-party Python libraries that have MIT or BSD licenses.
 .. |Build Status| image:: https://github.com/terrapower/armi/actions/workflows/unittests.yaml/badge.svg?branch=main
     :target: https://github.com/terrapower/armi/actions/workflows/unittests.yaml
 
-.. |Code Coverage| image:: https://coveralls.io/repos/github/terrapower/armi/badge.svg?branch=main&kill_cache=7
+.. |Code Coverage| image:: https://coveralls.io/repos/github/terrapower/armi/badge.svg?branch=main&kill_cache=2
     :target: https://coveralls.io/github/terrapower/armi?branch=main
 

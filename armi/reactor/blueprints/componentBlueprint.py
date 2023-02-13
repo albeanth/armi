@@ -243,7 +243,7 @@ class ComponentBlueprint(yamlize.Object):
 
         expandElementals(mat, blueprint)
 
-        missing = set(mat.p.massFrac.keys()).difference(nucsInProblem)
+        missing = set(mat.massFrac.keys()).difference(nucsInProblem)
 
         if missing:
             raise ValueError(
@@ -270,7 +270,7 @@ def expandElementals(mat, blueprint):
     """
     elementExpansionPairs = []
     for elementToExpand in blueprint.elementsToExpand:
-        if elementToExpand.symbol not in mat.p.massFrac:
+        if elementToExpand.symbol not in mat.massFrac:
             continue
         nucFlags = blueprint.nuclideFlags.get(elementToExpand.symbol)
         nuclidesToBecome = (
@@ -280,9 +280,7 @@ def expandElementals(mat, blueprint):
         )
         elementExpansionPairs.append((elementToExpand, nuclidesToBecome))
 
-    densityTools.expandElementalMassFracsToNuclides(
-        mat.p.massFrac, elementExpansionPairs
-    )
+    densityTools.expandElementalMassFracsToNuclides(mat.massFrac, elementExpansionPairs)
 
 
 def insertDepletableNuclideKeys(c, blueprint):
@@ -302,7 +300,8 @@ def insertDepletableNuclideKeys(c, blueprint):
     if c.hasFlags(Flags.DEPLETABLE):
         # depletable components, whether auto-derived or explicitly flagged need expanded nucs
         nuclideBases.initReachableActiveNuclidesThroughBurnChain(
-            c.p.numberDensities, blueprint.activeNuclides
+            c.p.numberDensities,
+            blueprint.activeNuclides,
         )
 
 
