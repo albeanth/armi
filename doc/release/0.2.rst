@@ -8,12 +8,13 @@ Release Date: TBD
 
 What's new in ARMI
 ------------------
-#. TBD
+#. Remove unused `HCFcoretype` setting. (`PR#1179 <https://github.com/terrapower/armi/pull/1179>`_)
 #. TBD
 
 Bug fixes
 ---------
-#. Fixed TBD
+#. Fixed interface/event ``runLog.header`` for tight coupling. (`PR#1178 https://github.com/terrapower/armi/pull/1178`_)
+#. Fixed circular import bug in ``reactors.py`` caused by importing settings constants. (`PR#1185 <https://github.com/terrapower/armi/pull/1185>`_)
 #. Fixed TBD
 
 
