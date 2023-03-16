@@ -252,12 +252,12 @@ class AxialExpansionChanger:
         """Utilizes assembly linkage to do axial expansion"""
         mesh = [0.0]
         numOfBlocks = self.linked.a.countBlocksWithFlags()
-        runLog.debug(
-            "Printing component expansion information (growth percentage and 'target component')"
-            f"for each block in assembly {self.linked.a}."
-        )
+        # runLog.debug(
+        #     "Printing component expansion information (growth percentage and 'target component')"
+        #     f"for each block in assembly {self.linked.a}."
+        # )
         for ib, b in enumerate(self.linked.a):
-            runLog.debug(msg=f"  Block {b}")
+            # runLog.debug(msg=f"  Block {b}")
             blockHeight = b.getHeight()
             # set bottom of block equal to top of block below it
             # if ib == 0, leave block bottom = 0.0
@@ -267,7 +267,7 @@ class AxialExpansionChanger:
             if not isDummyBlock:
                 for c in _getSolidComponents(b):
                     growFrac = self.expansionData.getExpansionFactor(c)
-                    runLog.debug(msg=f"      Component {c}, growFrac = {growFrac:.4e}")
+                    # runLog.debug(msg=f"      Component {c}, growFrac = {growFrac:.4e}")
                     if growFrac >= 0.0:
                         c.height = (1.0 + growFrac) * blockHeight
                     else:
@@ -287,14 +287,14 @@ class AxialExpansionChanger:
                     c.ztop = c.zbottom + c.height
                     # redistribute block boundaries if on the target component
                     if self.expansionData.isTargetComponent(c):
-                        if b.axialExpTargetComponent is None:
-                            runLog.debug(
-                                f"      Component {c} is target component (inferred)"
-                            )
-                        else:
-                            runLog.debug(
-                                f"      Component {c} is target component (blueprints defined)"
-                            )
+                        # if b.axialExpTargetComponent is None:
+                        #     runLog.debug(
+                        #         f"      Component {c} is target component (inferred)"
+                        #     )
+                        # else:
+                        #     runLog.debug(
+                        #         f"      Component {c} is target component (blueprints defined)"
+                        #     )
                         b.p.ztop = c.ztop
 
             # see also b.setHeight()
@@ -480,26 +480,26 @@ class AssemblyAxialLinkage:
 
         self.linkedBlocks[b] = [lowerLinkedBlock, upperLinkedBlock]
 
-        if lowerLinkedBlock is None:
-            runLog.debug(
-                "Assembly {0:22s} at location {1:22s}, Block {2:22s}"
-                "is not linked to a block below!".format(
-                    str(self.a.getName()),
-                    str(self.a.getLocation()),
-                    str(b.p.flags),
-                ),
-                single=True,
-            )
-        if upperLinkedBlock is None:
-            runLog.debug(
-                "Assembly {0:22s} at location {1:22s}, Block {2:22s}"
-                "is not linked to a block above!".format(
-                    str(self.a.getName()),
-                    str(self.a.getLocation()),
-                    str(b.p.flags),
-                ),
-                single=True,
-            )
+        # if lowerLinkedBlock is None:
+        #     runLog.debug(
+        #         "Assembly {0:22s} at location {1:22s}, Block {2:22s}"
+        #         "is not linked to a block below!".format(
+        #             str(self.a.getName()),
+        #             str(self.a.getLocation()),
+        #             str(b.p.flags),
+        #         ),
+        #         single=True,
+        #     )
+        # if upperLinkedBlock is None:
+        #     runLog.debug(
+        #         "Assembly {0:22s} at location {1:22s}, Block {2:22s}"
+        #         "is not linked to a block above!".format(
+        #             str(self.a.getName()),
+        #             str(self.a.getLocation()),
+        #             str(b.p.flags),
+        #         ),
+        #         single=True,
+        #     )
 
     def _getLinkedComponents(self, b, c):
         """retrieve the axial linkage for component c
@@ -536,28 +536,28 @@ class AssemblyAxialLinkage:
 
         self.linkedComponents[c] = lstLinkedC
 
-        if lstLinkedC[0] is None:
-            runLog.debug(
-                "Assembly {0:22s} at location {1:22s}, Block {2:22s}, Component {3:22s} "
-                "has nothing linked below it!".format(
-                    str(self.a.getName()),
-                    str(self.a.getLocation()),
-                    str(b.p.flags),
-                    str(c.p.flags),
-                ),
-                single=True,
-            )
-        if lstLinkedC[1] is None:
-            runLog.debug(
-                "Assembly {0:22s} at location {1:22s}, Block {2:22s}, Component {3:22s} "
-                "has nothing linked above it!".format(
-                    str(self.a.getName()),
-                    str(self.a.getLocation()),
-                    str(b.p.flags),
-                    str(c.p.flags),
-                ),
-                single=True,
-            )
+        # if lstLinkedC[0] is None:
+        #     runLog.debug(
+        #         "Assembly {0:22s} at location {1:22s}, Block {2:22s}, Component {3:22s} "
+        #         "has nothing linked below it!".format(
+        #             str(self.a.getName()),
+        #             str(self.a.getLocation()),
+        #             str(b.p.flags),
+        #             str(c.p.flags),
+        #         ),
+        #         single=True,
+        #     )
+        # if lstLinkedC[1] is None:
+        #     runLog.debug(
+        #         "Assembly {0:22s} at location {1:22s}, Block {2:22s}, Component {3:22s} "
+        #         "has nothing linked above it!".format(
+        #             str(self.a.getName()),
+        #             str(self.a.getLocation()),
+        #             str(b.p.flags),
+        #             str(c.p.flags),
+        #         ),
+        #         single=True,
+        #     )
 
 
 def _determineLinked(componentA, componentB):

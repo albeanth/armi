@@ -690,13 +690,13 @@ class UniformMeshGeometryConverter(GeometryConverter):
         src = self._sourceReactor
         refAssem = src.core.refAssem
 
-        refNumPoints = len(src.core.findAllAxialMeshPoints([refAssem])) - 1
+        # refNumPoints = len(src.core.findAllAxialMeshPoints([refAssem])) - 1
         allMeshes = []
         for a in src.core:
             # Get the mesh points of the assembly, neglecting the first coordinate
             # (typically zero).
             aMesh = src.core.findAllAxialMeshPoints([a])[1:]
-            if len(aMesh) == refNumPoints:
+            if a.hasFlags(Flags.FUEL):
                 allMeshes.append(aMesh)
         self._uniformMesh = average1DWithinTolerance(numpy.array(allMeshes))
 

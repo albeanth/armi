@@ -1803,7 +1803,7 @@ class Core(composites.Composite):
 
         There is a challenge with TRZ blocks because we need the mesh centroid in terms of RZT, not XYZ
         """
-        runLog.debug("Finding all mesh points.")
+        # runLog.debug("Finding all mesh points.")
         if assems is None:
             assems = list(self)
 
