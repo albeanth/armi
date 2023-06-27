@@ -46,8 +46,8 @@ class UThZr(FuelMaterial):
         self.zrFrac = 0.09999  # custom param REM
         self.thFrac = 0.00001
 
-    def pseudoDensity(self, Tk=None, Tc=None):
-        """Calculate the mass density in g/cc of U-Zr alloy with various percents."""
+    def computeReferenceDensity(self) -> float:
+        """Calculate the mass density in g/cc of U-Zr alloy with various percents"""
         zrFrac = self.zrFrac
         thFrac = self.thFrac
         uFrac = 1 - zrFrac - thFrac
@@ -60,18 +60,16 @@ class UThZr(FuelMaterial):
             )
             return None
 
-        Tk = getTk(Tc, Tk)
-
         u0 = 19.1
         zr0 = 6.52
         th0 = 11.68
         # use vegard's law to mix densities by weight fraction at 50C
-        # uzr0 = 1.0/(zrFrac/zr0+(1-zrFrac)/u0)
-        uThZr0 = 1.0 / (zrFrac / zr0 + (uFrac) / u0 + thFrac / th0)
+        return 1.0 / (zrFrac / zr0 + (uFrac) / u0 + thFrac / th0)
 
-        dLL = self.linearExpansionPercent(Tk=Tk)
+    def pseudoDensity(self, Tk=None, Tc=None):
+        """no thermal expansion percent prescribed, so just return theoretical density"""
+        return self.computeReferenceDensity()
 
-        f = (1 + dLL / 100.0) ** 2
-        density = uThZr0 * (1.0 + (1.0 - f) / f)
-
-        return density
+    def density(self, Tk: float = None, Tc: float = None) -> float:
+        """no thermal expansion percent prescribed, so just return theoretical density"""
+        return self.computeReferenceDensity()
