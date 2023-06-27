@@ -337,24 +337,12 @@ class Component(composites.Composite, metaclass=ComponentType):
         - After the expansion, the density of the component should reflect the 3d
           density of the material
         """
-        # note, that this is not the actual material density, but rather 2D expanded
-        # `density` is 3D density
         # call getProperty to cache and improve speed
-        density = self.material.getProperty("pseudoDensity", Tc=self.temperatureInC)
+        density = self.material.getProperty("density", Tc=self.temperatureInC)
 
         self.p.numberDensities = densityTools.getNDensFromMasses(
             density, self.material.massFrac
         )
-
-        # material needs to be expanded from the material's cold temp to hot,
-        # not components cold temp, so we don't use mat.linearExpansionFactor or
-        # component.getThermalExpansionFactor.
-        # Materials don't typically define the temperature for which their references
-        # density is defined so linearExpansionPercent must be called
-        coldMatAxialExpansionFactor = (
-            1.0 + self.material.linearExpansionPercent(Tc=self.temperatureInC) / 100
-        )
-        self.changeNDensByFactor(1.0 / coldMatAxialExpansionFactor)
 
     def adjustDensityForHeightExpansion(self, newHot):
         """
