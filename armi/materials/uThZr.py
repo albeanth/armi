@@ -69,7 +69,7 @@ class UThZr(FuelMaterial):
     def pseudoDensity(self, Tk=None, Tc=None):
         """no thermal expansion percent prescribed, so just return theoretical density"""
         return self.computeReferenceDensity()
-    
+
     def density(self, Tk: float = None, Tc: float = None) -> float:
         """no thermal expansion percent prescribed, so just return theoretical density"""
         return self.computeReferenceDensity()
