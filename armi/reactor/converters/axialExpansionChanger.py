@@ -13,8 +13,10 @@
 # limitations under the License.
 """Enable component-wise axial expansion for assemblies and/or a reactor."""
 
+import collections
 from statistics import mean
 from typing import List
+from tabulate import tabulate
 
 from armi import runLog
 from armi.materials import material
@@ -237,22 +239,43 @@ class AxialExpansionChanger:
         """Utilizes assembly linkage to do axial expansion."""
         mesh = [0.0]
         numOfBlocks = self.linked.a.countBlocksWithFlags()
-        runLog.debug(
-            "Printing component expansion information (growth percentage and 'target component')"
-            f"for each block in assembly {self.linked.a}."
-        )
+        massConservationReport = {}
+        massConservationReport[self.linked.a] = [
+            "U235 Mass (g)",
+            "B10 Mass (g)",
+            "FE56 Mass (g)",
+        ]
+        massConservationReport["pre-exp"] = [
+            self.linked.a.getMass("U235"),
+            self.linked.a.getMass("B10"),
+            self.linked.a.getMass("FE56"),
+        ]
+        detailedMassConservationReport = collections.defaultdict(list)
         for ib, b in enumerate(self.linked.a):
-            runLog.debug(msg=f"  Block {b}")
-            blockHeight = b.getHeight()
+            detailedMassConservationReport["Block"].append(b)
             # set bottom of block equal to top of block below it
             # if ib == 0, leave block bottom = 0.0
             if ib > 0:
                 b.p.zbottom = self.linked.linkedBlocks[b][0].p.ztop
             isDummyBlock = ib == (numOfBlocks - 1)
-            if not isDummyBlock:
-                for c in getSolidComponents(b):
+            preMass = {}
+            for ic, c in enumerate(getSolidComponents(b)):
+                if ic > 0:
+                    detailedMassConservationReport["Block"].append(" ")
+                detailedMassConservationReport["Component"].append(c)
+                preMass[c] = c.getMass()
+                detailedMassConservationReport["(prev) mass"].append(preMass[c])
+                if not isDummyBlock:
                     growFrac = self.expansionData.getExpansionFactor(c)
                     prevCompHeight = self._getCompHeight(c)
+                    detailedMassConservationReport["GrowFrac"].append(growFrac)
+                    detailedMassConservationReport["(prev) c.bottom"].append(
+                        b.p.zbottom
+                    )
+                    detailedMassConservationReport["(prev) c.top"].append(b.p.ztop)
+                    detailedMassConservationReport["(prev) c.height"].append(
+                        prevCompHeight
+                    )
                     c.height = growFrac * prevCompHeight
                     # align linked components
                     if ib == 0:
@@ -267,6 +290,9 @@ class AxialExpansionChanger:
                             # the top of the block below it
                             c.zbottom = self.linked.linkedBlocks[b][0].p.ztop
                     c.ztop = c.zbottom + c.height
+                    detailedMassConservationReport["(post) c.bottom"].append(c.zbottom)
+                    detailedMassConservationReport["(post) c.top"].append(c.ztop)
+                    detailedMassConservationReport["(post) c.height"].append(c.height)
                     # update component number densities
                     newNumberDensities = {
                         nuc: c.getNumberDensity(nuc) / growFrac
@@ -285,6 +311,11 @@ class AxialExpansionChanger:
             for c in getSolidComponents(b):
                 newCompHeight = self._getCompHeight(c)
                 c.p.volume = c.getArea() * newCompHeight
+                postExpMass = c.getMass()
+                detailedMassConservationReport["(post) mass"].append(postExpMass)
+                detailedMassConservationReport["(post - pre) mass"].append(
+                    postExpMass - preMass[c]
+                )
             # redo mesh -- functionality based on assembly.calculateZCoords()
             mesh.append(b.p.ztop)
             b.spatialLocator = self.linked.a.spatialGrid[0, 0, ib]
@@ -292,6 +323,33 @@ class AxialExpansionChanger:
         bounds = list(self.linked.a.spatialGrid._bounds)
         bounds[2] = array(mesh)
         self.linked.a.spatialGrid._bounds = tuple(bounds)
+        massConservationReport["post-exp"] = [
+            self.linked.a.getMass("U235"),
+            self.linked.a.getMass("B10"),
+            self.linked.a.getMass("FE56"),
+        ]
+        diff = [
+            round(new - orig, 10) if new else 0.0
+            for new, orig in zip(
+                massConservationReport["post-exp"], massConservationReport["pre-exp"]
+            )
+        ]
+        massConservationReport["round(post - pre, 10)"] = diff
+        if any(diff):
+            detailedMassConservationReport = (
+                self._setOrderForDetailedMassConservationReport(
+                    detailedMassConservationReport
+                )
+            )
+            runLog.extra(
+                tabulate(massConservationReport, headers="keys", floatfmt="0.8e")
+            )
+            runLog.extra(
+                tabulate(
+                    detailedMassConservationReport, headers="keys", floatfmt="0.8e"
+                )
+            )
+
     @staticmethod
     def _getCompHeight(component) -> float:
         """get the component height, if doesn't exist, get parent block height"""
@@ -300,6 +358,25 @@ class AxialExpansionChanger:
         except AttributeError:
             compHeight = component.parent.getHeight()
         return compHeight
+
+    @staticmethod
+    def _setOrderForDetailedMassConservationReport(origDict) -> dict:
+        """return the detailed mass conservation report dictionary in a useful order"""
+        keyOrder = [
+            "Block",
+            "Component",
+            "GrowFrac",
+            "(prev) c.bottom",
+            "(prev) c.top",
+            "(prev) c.height",
+            "(post) c.bottom",
+            "(post) c.top",
+            "(post) c.height",
+            "(prev) mass",
+            "(post) mass",
+            "(post - pre) mass",
+        ]
+        return {i: origDict[i] for i in keyOrder}
 
     def manageCoreMesh(self, r):
         """Manage core mesh post assembly-level expansion.
