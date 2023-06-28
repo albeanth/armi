@@ -276,10 +276,8 @@ class AxialExpansionChanger:
                     # redistribute block boundaries if on the target component
                     if self.expansionData.isTargetComponent(c):
                         b.p.ztop = c.ztop
-                        b.p.height = b.p.ztop - b.p.zbottom
-            else:
-                b.p.height = b.p.ztop - b.p.zbottom
 
+            b.p.height = b.p.ztop - b.p.zbottom
             b.p.z = b.p.zbottom + b.getHeight() / 2.0
 
             _checkBlockHeight(b)
