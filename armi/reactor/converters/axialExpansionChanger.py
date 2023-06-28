@@ -252,8 +252,8 @@ class AxialExpansionChanger:
             if not isDummyBlock:
                 for c in getSolidComponents(b):
                     growFrac = self.expansionData.getExpansionFactor(c)
-                    runLog.debug(msg=f"      Component {c}, growFrac = {growFrac:.4e}")
-                    c.height = growFrac * blockHeight
+                    prevCompHeight = self._getCompHeight(c)
+                    c.height = growFrac * prevCompHeight
                     # align linked components
                     if ib == 0:
                         c.zbottom = 0.0
@@ -283,7 +283,8 @@ class AxialExpansionChanger:
             _checkBlockHeight(b)
             # call component.clearCache to update the component volume, and therefore the masses, of all solid components.
             for c in getSolidComponents(b):
-                c.clearCache()
+                newCompHeight = self._getCompHeight(c)
+                c.p.volume = c.getArea() * newCompHeight
             # redo mesh -- functionality based on assembly.calculateZCoords()
             mesh.append(b.p.ztop)
             b.spatialLocator = self.linked.a.spatialGrid[0, 0, ib]
@@ -291,6 +292,14 @@ class AxialExpansionChanger:
         bounds = list(self.linked.a.spatialGrid._bounds)
         bounds[2] = array(mesh)
         self.linked.a.spatialGrid._bounds = tuple(bounds)
+    @staticmethod
+    def _getCompHeight(component) -> float:
+        """get the component height, if doesn't exist, get parent block height"""
+        try:
+            compHeight = component.height
+        except AttributeError:
+            compHeight = component.parent.getHeight()
+        return compHeight
 
     def manageCoreMesh(self, r):
         """Manage core mesh post assembly-level expansion.
