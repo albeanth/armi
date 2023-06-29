@@ -237,20 +237,19 @@ class AxialExpansionChanger:
 
     def axiallyExpandAssembly(self):
         """Utilizes assembly linkage to do axial expansion."""
+        # Set up conservation report information (useful for debugging)
+        massConservationReport = {}
+        materialMasses = collections.defaultdict(float)
+        for b in self.linked.a:
+            for c in getSolidComponents(b):
+                materialMasses[c.material.name] += c.getMass()
+        massConservationReport[self.linked.a] = list(materialMasses.keys())
+        massConservationReport["pre-exp"] = list(materialMasses.values())
+        detailedMassConservationReport = collections.defaultdict(list)
+
         mesh = [0.0]
         numOfBlocks = self.linked.a.countBlocksWithFlags()
-        massConservationReport = {}
-        massConservationReport[self.linked.a] = [
-            "U235 Mass (g)",
-            "B10 Mass (g)",
-            "FE56 Mass (g)",
-        ]
-        massConservationReport["pre-exp"] = [
-            self.linked.a.getMass("U235"),
-            self.linked.a.getMass("B10"),
-            self.linked.a.getMass("FE56"),
-        ]
-        detailedMassConservationReport = collections.defaultdict(list)
+        materialMasses = collections.defaultdict(float)
         for ib, b in enumerate(self.linked.a):
             detailedMassConservationReport["Block"].append(b)
             # set bottom of block equal to top of block below it
@@ -260,12 +259,14 @@ class AxialExpansionChanger:
             isDummyBlock = ib == (numOfBlocks - 1)
             preMass = {}
             for ic, c in enumerate(getSolidComponents(b)):
+                # populate pre-expansion mass values
                 if ic > 0:
                     detailedMassConservationReport["Block"].append(" ")
                 detailedMassConservationReport["Component"].append(c)
                 preMass[c] = c.getMass()
                 detailedMassConservationReport["(prev) mass"].append(preMass[c])
                 if not isDummyBlock:
+                    # populate pre-expansion component geometry
                     growFrac = self.expansionData.getExpansionFactor(c)
                     prevCompHeight = self._getCompHeight(c)
                     detailedMassConservationReport["GrowFrac"].append(growFrac)
@@ -276,6 +277,7 @@ class AxialExpansionChanger:
                     detailedMassConservationReport["(prev) c.height"].append(
                         prevCompHeight
                     )
+                    # perform axial expansion
                     c.height = growFrac * prevCompHeight
                     # align linked components
                     if ib == 0:
@@ -290,6 +292,7 @@ class AxialExpansionChanger:
                             # the top of the block below it
                             c.zbottom = self.linked.linkedBlocks[b][0].p.ztop
                     c.ztop = c.zbottom + c.height
+                    # populate post-expansion component geometry
                     detailedMassConservationReport["(post) c.bottom"].append(c.zbottom)
                     detailedMassConservationReport["(post) c.top"].append(c.ztop)
                     detailedMassConservationReport["(post) c.height"].append(c.height)
@@ -307,6 +310,7 @@ class AxialExpansionChanger:
             for c in getSolidComponents(b):
                 c.clearCache()
                 postExpMass = c.getMass()
+                materialMasses[c.material.name] += postExpMass
                 detailedMassConservationReport["(post) mass"].append(postExpMass)
                 detailedMassConservationReport["(post - pre) mass"].append(
                     postExpMass - preMass[c]
@@ -318,11 +322,8 @@ class AxialExpansionChanger:
         bounds = list(self.linked.a.spatialGrid._bounds)
         bounds[2] = array(mesh)
         self.linked.a.spatialGrid._bounds = tuple(bounds)
-        massConservationReport["post-exp"] = [
-            self.linked.a.getMass("U235"),
-            self.linked.a.getMass("B10"),
-            self.linked.a.getMass("FE56"),
-        ]
+        # populate remaining post-expansion criteria for conservation reports
+        massConservationReport["post-exp"] = list(materialMasses.values())
         diff = [
             round(new - orig, 10) if new else 0.0
             for new, orig in zip(
