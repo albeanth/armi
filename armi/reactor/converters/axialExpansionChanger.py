@@ -245,8 +245,12 @@ class AxialExpansionChanger:
             for c in getSolidComponents(b):
                 materialMasses[c.material.name] += c.getMass()
                 componentMasses[c.name] += c.getMass()
-        massConservationReport[self.linked.a] = list(materialMasses.keys()) + [None] + list(componentMasses.keys())
-        massConservationReport["pre-exp"] = list(materialMasses.values()) + [None] + list(componentMasses.values())
+        massConservationReport[self.linked.a] = (
+            list(materialMasses.keys()) + [None] + list(componentMasses.keys())
+        )
+        massConservationReport["pre-exp"] = (
+            list(materialMasses.values()) + [None] + list(componentMasses.values())
+        )
         detailedMassConservationReport = collections.defaultdict(list)
 
         mesh = [0.0]
@@ -300,7 +304,7 @@ class AxialExpansionChanger:
                     detailedMassConservationReport["(post) c.top"].append(c.ztop)
                     detailedMassConservationReport["(post) c.height"].append(c.height)
                     # update component number densities
-                    c.changeNDensByFactor(1.0/growFrac)
+                    c.changeNDensByFactor(1.0 / growFrac)
                     # redistribute block boundaries if on the target component
                     if self.expansionData.isTargetComponent(c):
                         b.p.ztop = c.ztop
@@ -327,23 +331,27 @@ class AxialExpansionChanger:
         bounds[2] = array(mesh)
         self.linked.a.spatialGrid._bounds = tuple(bounds)
         # populate remaining post-expansion criteria for conservation reports
-        massConservationReport["post-exp"] = list(materialMasses.values()) + [None] + list(componentMasses.values())
+        massConservationReport["post-exp"] = (
+            list(materialMasses.values()) + [None] + list(componentMasses.values())
+        )
         # check for differences in pre and post expansion mass greater than 1e-9 grams
         diff = [
-            round(new - orig, 10) if new else " "
+            round(new - orig, 9) if new else None
             for new, orig in zip(
                 massConservationReport["post-exp"], massConservationReport["pre-exp"]
             )
         ]
-        massConservationReport["round(post - pre, 10)"] = diff
         if any(diff):
+            # log the high level mass conservation report
+            massConservationReport["round(post - pre, 9)"] = diff
+            runLog.extra(
+                tabulate(massConservationReport, headers="keys", floatfmt="0.8e")
+            )
+            # log the detailed mass conservation report
             detailedMassConservationReport = (
                 self._setOrderForDetailedMassConservationReport(
                     detailedMassConservationReport
                 )
-            )
-            runLog.extra(
-                tabulate(massConservationReport, headers="keys", floatfmt="0.8e")
             )
             runLog.extra(
                 tabulate(
