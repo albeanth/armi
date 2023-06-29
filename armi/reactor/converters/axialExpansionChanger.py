@@ -294,11 +294,7 @@ class AxialExpansionChanger:
                     detailedMassConservationReport["(post) c.top"].append(c.ztop)
                     detailedMassConservationReport["(post) c.height"].append(c.height)
                     # update component number densities
-                    newNumberDensities = {
-                        nuc: c.getNumberDensity(nuc) / growFrac
-                        for nuc in c.getNuclides()
-                    }
-                    c.setNumberDensities(newNumberDensities)
+                    c.changeNDensByFactor(1.0/growFrac)
                     # redistribute block boundaries if on the target component
                     if self.expansionData.isTargetComponent(c):
                         b.p.ztop = c.ztop
@@ -309,8 +305,7 @@ class AxialExpansionChanger:
             _checkBlockHeight(b)
             # call component.clearCache to update the component volume, and therefore the masses, of all solid components.
             for c in getSolidComponents(b):
-                newCompHeight = self._getCompHeight(c)
-                c.p.volume = c.getArea() * newCompHeight
+                c.clearCache()
                 postExpMass = c.getMass()
                 detailedMassConservationReport["(post) mass"].append(postExpMass)
                 detailedMassConservationReport["(post - pre) mass"].append(
