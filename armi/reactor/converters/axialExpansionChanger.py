@@ -240,16 +240,19 @@ class AxialExpansionChanger:
         # Set up conservation report information (useful for debugging)
         massConservationReport = {}
         materialMasses = collections.defaultdict(float)
+        componentMasses = collections.defaultdict(float)
         for b in self.linked.a:
             for c in getSolidComponents(b):
                 materialMasses[c.material.name] += c.getMass()
-        massConservationReport[self.linked.a] = list(materialMasses.keys())
-        massConservationReport["pre-exp"] = list(materialMasses.values())
+                componentMasses[c.name] += c.getMass()
+        massConservationReport[self.linked.a] = list(materialMasses.keys()) + [None] + list(componentMasses.keys())
+        massConservationReport["pre-exp"] = list(materialMasses.values()) + [None] + list(componentMasses.values())
         detailedMassConservationReport = collections.defaultdict(list)
 
         mesh = [0.0]
         numOfBlocks = self.linked.a.countBlocksWithFlags()
         materialMasses = collections.defaultdict(float)
+        componentMasses = collections.defaultdict(float)
         for ib, b in enumerate(self.linked.a):
             detailedMassConservationReport["Block"].append(b)
             # set bottom of block equal to top of block below it
@@ -311,6 +314,7 @@ class AxialExpansionChanger:
                 c.clearCache()
                 postExpMass = c.getMass()
                 materialMasses[c.material.name] += postExpMass
+                componentMasses[c.name] += postExpMass
                 detailedMassConservationReport["(post) mass"].append(postExpMass)
                 detailedMassConservationReport["(post - pre) mass"].append(
                     postExpMass - preMass[c]
@@ -323,9 +327,10 @@ class AxialExpansionChanger:
         bounds[2] = array(mesh)
         self.linked.a.spatialGrid._bounds = tuple(bounds)
         # populate remaining post-expansion criteria for conservation reports
-        massConservationReport["post-exp"] = list(materialMasses.values())
+        massConservationReport["post-exp"] = list(materialMasses.values()) + [None] + list(componentMasses.values())
+        # check for differences in pre and post expansion mass greater than 1e-9 grams
         diff = [
-            round(new - orig, 10) if new else 0.0
+            round(new - orig, 10) if new else " "
             for new, orig in zip(
                 massConservationReport["post-exp"], massConservationReport["pre-exp"]
             )
