@@ -353,7 +353,7 @@ class AxialExpansionChanger:
                     detailedMassConservationReport
                 )
             )
-            runLog.extra(
+            runLog.debug(
                 tabulate(
                     detailedMassConservationReport, headers="keys", floatfmt="0.8e"
                 )
