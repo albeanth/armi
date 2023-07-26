@@ -14,13 +14,20 @@
 """Enable component-wise axial expansion for assemblies and/or a reactor."""
 
 from statistics import mean
-from typing import List
+from typing import Union, List, TYPE_CHECKING
 
 from armi import runLog
 from armi.materials import material
 from armi.reactor.components import UnshapedComponent
 from armi.reactor.flags import Flags
 from numpy import array
+
+if TYPE_CHECKING:
+    from armi.reactor.flags import FlagType
+    from armi.reactor.blocks import Block
+    from armi.reactor.components import Component
+    from armi.reactor.assemblies import Assembly
+    from armi.reactor.reactors import Reactor
 
 TARGET_FLAGS_IN_PREFERRED_ORDER = [
     Flags.FUEL,
@@ -31,11 +38,11 @@ TARGET_FLAGS_IN_PREFERRED_ORDER = [
 ]
 
 
-def getDefaultReferenceAssem(assems):
+def getDefaultReferenceAssem(assems: List[Assembly]) -> Union[Assembly, None]:
     """Return a default reference assembly."""
     # if assemblies are defined in blueprints, handle meshing
     # assume finest mesh is reference
-    assemsByNumBlocks = sorted(
+    assemsByNumBlocks: List[Assembly] = sorted(
         assems,
         key=lambda a: len(a),
         reverse=True,
@@ -44,13 +51,17 @@ def getDefaultReferenceAssem(assems):
 
 
 def makeAssemsAbleToSnapToUniformMesh(
-    assems, nonUniformAssemFlags, referenceAssembly=None
+    assems: List[Assembly],
+    nonUniformAssemFlags: Flags,
+    referenceAssembly: Union[Assembly, None] = None,
 ):
     """Make this set of assemblies aware of the reference mesh so they can stay uniform as they axially expand."""
     if not referenceAssembly:
         referenceAssembly = getDefaultReferenceAssem(assems)
     # make the snap lists so assems know how to expand
-    nonUniformAssems = [Flags.fromStringIgnoreErrors(t) for t in nonUniformAssemFlags]
+    nonUniformAssems: List[Flags] = [
+        Flags.fromStringIgnoreErrors(t) for t in nonUniformAssemFlags
+    ]
     for a in assems:
         if any(a.hasFlags(f) for f in nonUniformAssems):
             continue
@@ -58,9 +69,9 @@ def makeAssemsAbleToSnapToUniformMesh(
 
 
 def expandColdDimsToHot(
-    assems: list,
+    assems: Union[Assembly, List[Assembly]],
     isDetailedAxialExpansion: bool,
-    referenceAssembly=None,
+    referenceAssembly: Union[Assembly, None] = None,
 ):
     """
     Expand BOL assemblies, resolve disjoint axial mesh (if needed), and update block BOL heights.
@@ -83,20 +94,20 @@ def expandColdDimsToHot(
     --------
     :py:meth:`armi.reactor.converters.axialExpansionChanger.AxialExpansionChanger.applyColdHeightMassIncrease`
     """
-    assems = list(assems)
+    aList: List[Assembly] = assems if isinstance(assems, List) else list(assems)
     if not referenceAssembly:
-        referenceAssembly = getDefaultReferenceAssem(assems)
+        referenceAssembly = getDefaultReferenceAssem(aList)
     axialExpChanger = AxialExpansionChanger(isDetailedAxialExpansion)
-    for a in assems:
+    for a in aList:
         axialExpChanger.setAssembly(a, expandFromTinputToThot=True)
         axialExpChanger.applyColdHeightMassIncrease()
         axialExpChanger.expansionData.computeThermalExpansionFactors()
         axialExpChanger.axiallyExpandAssembly()
     if not isDetailedAxialExpansion:
-        for a in assems:
+        for a in aList:
             a.setBlockMesh(referenceAssembly.getAxialMesh())
     # update block BOL heights to reflect hot heights
-    for a in assems:
+    for a in aList:
         for b in a:
             b.p.heightBOL = b.getHeight()
             b.completeInitialLoading()
@@ -129,12 +140,12 @@ class AxialExpansionChanger:
         detailedAxialExpansion : bool, optional
             A boolean to indicate whether or not detailedAxialExpansion is to be utilized.
         """
-        self._detailedAxialExpansion = detailedAxialExpansion
-        self.linked = None
-        self.expansionData = None
+        self._detailedAxialExpansion: bool = detailedAxialExpansion
+        self.linked: AssemblyAxialLinkage = AssemblyAxialLinkage()
+        self.expansionData: ExpansionData = ExpansionData()
 
     def performPrescribedAxialExpansion(
-        self, a, componentLst: list, percents: list, setFuel=True
+        self, a: Assembly, componentLst: list, percents: list, setFuel=True
     ):
         """Perform axial expansion of an assembly given prescribed expansion percentages.
 
@@ -160,7 +171,7 @@ class AxialExpansionChanger:
 
     def performThermalAxialExpansion(
         self,
-        a,
+        a: Assembly,
         tempGrid: list,
         tempField: list,
         setFuel: bool = True,
@@ -189,8 +200,8 @@ class AxialExpansionChanger:
         self.axiallyExpandAssembly()
 
     def reset(self):
-        self.linked = None
-        self.expansionData = None
+        self.linked = AssemblyAxialLinkage()
+        self.expansionData = ExpansionData()
 
     def setAssembly(self, a, setFuel=True, expandFromTinputToThot=False):
         """Set the armi assembly to be changed and init expansion data class for assembly.
@@ -213,8 +224,8 @@ class AxialExpansionChanger:
         the temperature distribution is the primary factor in determining the cumulative loss of mass conservation.
         Additional details will be documented in :ref:`axialExpansion` of the documentation.
         """
-        self.linked = AssemblyAxialLinkage(a)
-        self.expansionData = ExpansionData(
+        self.linked._setAssembly(a)
+        self.expansionData._setAssembly(
             a, setFuel=setFuel, expandFromTinputToThot=expandFromTinputToThot
         )
         self._isTopDummyBlockPresent()
@@ -231,7 +242,7 @@ class AxialExpansionChanger:
         the expansion factor applied during applyMaterialMassFracsToNumberDensities.
         """
         for c in self.linked.a.getComponents():
-            axialExpansionFactor = 1.0 + c.material.linearExpansionFactor(
+            axialExpansionFactor: float = 1.0 + c.material.linearExpansionFactor(
                 c.temperatureInC, c.inputTemperatureInC
             )
             c.changeNDensByFactor(axialExpansionFactor)
@@ -245,7 +256,7 @@ class AxialExpansionChanger:
         - If false, the top most block in the assembly is artificially chopped
           to preserve the assembly height. A runLog.Warning also issued.
         """
-        blkLst = self.linked.a.getBlocks()
+        blkLst: List[Block] = self.linked.a.getBlocks()
         if not blkLst[-1].hasFlags(Flags.DUMMY):
             runLog.warning(
                 f"No dummy block present at the top of {self.linked.a}! "
@@ -259,15 +270,16 @@ class AxialExpansionChanger:
 
     def axiallyExpandAssembly(self):
         """Utilizes assembly linkage to do axial expansion."""
-        mesh = [0.0]
-        numOfBlocks = self.linked.a.countBlocksWithFlags()
+        cGeom: dict[Component, dict[str, float]] = {}
+        mesh: List[float] = [0.0]
+        numOfBlocks: int = self.linked.a.countBlocksWithFlags()
         runLog.debug(
             "Printing component expansion information (growth percentage and 'target component')"
             f"for each block in assembly {self.linked.a}."
         )
         for ib, b in enumerate(self.linked.a):
             runLog.debug(msg=f"  Block {b}")
-            blockHeight = b.getHeight()
+            blockHeight: float = b.getHeight()
             # set bottom of block equal to top of block below it
             # if ib == 0, leave block bottom = 0.0
             if ib > 0:
@@ -277,20 +289,24 @@ class AxialExpansionChanger:
                 for c in getSolidComponents(b):
                     growFrac = self.expansionData.getExpansionFactor(c)
                     runLog.debug(msg=f"      Component {c}, growFrac = {growFrac:.4e}")
-                    c.height = growFrac * blockHeight
+                    cGeom[c]["height"] = growFrac * blockHeight
                     # align linked components
                     if ib == 0:
-                        c.zbottom = 0.0
+                        cGeom[c]["zbottom"] = 0.0
                     else:
                         if self.linked.linkedComponents[c][0] is not None:
                             # use linked components below
-                            c.zbottom = self.linked.linkedComponents[c][0].ztop
+                            cGeom[c]["zbottom"] = self.linked.linkedComponents[c][
+                                0
+                            ].ztop
                         else:
                             # otherwise there aren't any linked components
                             # so just set the bottom of the component to
                             # the top of the block below it
-                            c.zbottom = self.linked.linkedBlocks[b][0].p.ztop
-                    c.ztop = c.zbottom + c.height
+                            cGeom[c]["c.zbottom"] = self.linked.linkedBlocks[b][
+                                0
+                            ].p.ztop
+                    cGeom[c]["ztop"] = cGeom[c]["zbottom"] + cGeom[c]["height"]
                     # update component number densities
                     newNumberDensities = {
                         nuc: c.getNumberDensity(nuc) / growFrac
@@ -299,7 +315,7 @@ class AxialExpansionChanger:
                     c.setNumberDensities(newNumberDensities)
                     # redistribute block boundaries if on the target component
                     if self.expansionData.isTargetComponent(c):
-                        b.p.ztop = c.ztop
+                        b.p.ztop = cGeom[c]["ztop"]
                         b.p.height = b.p.ztop - b.p.zbottom
             else:
                 b.p.height = b.p.ztop - b.p.zbottom
@@ -318,7 +334,7 @@ class AxialExpansionChanger:
         bounds[2] = array(mesh)
         self.linked.a.spatialGrid._bounds = tuple(bounds)
 
-    def manageCoreMesh(self, r):
+    def manageCoreMesh(self, r: Reactor):
         """Manage core mesh post assembly-level expansion.
 
         Parameters
@@ -338,7 +354,7 @@ class AxialExpansionChanger:
             for a in r.core.getAssemblies():
                 a.setBlockMesh(r.core.refAssem.getAxialMesh())
 
-        oldMesh = r.core.p.axialMesh
+        oldMesh: List[float] = r.core.p.axialMesh
         r.core.updateAxialMesh()
         if oldMesh:
             runLog.extra("Updated r.core.p.axialMesh (old, new)")
@@ -346,7 +362,7 @@ class AxialExpansionChanger:
                 runLog.extra(f"{old:.6e}\t{new:.6e}")
 
 
-def getSolidComponents(b):
+def getSolidComponents(b: Block) -> List[Component]:
     """
     Return list of components in the block that have solid material.
 
@@ -358,7 +374,7 @@ def getSolidComponents(b):
     return [c for c in b if not isinstance(c.material, material.Fluid)]
 
 
-def _checkBlockHeight(b):
+def _checkBlockHeight(b: Block):
     """
     Do some basic block height validation.
 
@@ -404,10 +420,12 @@ class AssemblyAxialLinkage:
         see also: self._getLinkedComponents
     """
 
-    def __init__(self, StdAssem):
-        self.a = StdAssem
-        self.linkedBlocks = {}
-        self.linkedComponents = {}
+    def __init__(self):
+        self.linkedBlocks: dict[Block, List[Union[Block, None]]] = {}
+        self.linkedComponents: dict[Component, List[Union[Component, None]]] = {}
+
+    def _setAssembly(self, a: Assembly):
+        self.a: Assembly = a
         self._determineAxialLinkage()
 
     def _determineAxialLinkage(self):
@@ -417,7 +435,7 @@ class AssemblyAxialLinkage:
             for c in getSolidComponents(b):
                 self._getLinkedComponents(b, c)
 
-    def _getLinkedBlocks(self, b):
+    def _getLinkedBlocks(self, b: Block):
         """Retrieve the axial linkage for block b.
 
         Parameters
@@ -440,9 +458,9 @@ class AssemblyAxialLinkage:
         | 0 |  Block 0 is linked to block 1.
         |_ _|
         """
-        lowerLinkedBlock = None
-        upperLinkedBlock = None
-        block_list = self.a.getChildren()
+        lowerLinkedBlock: Union[Block, None] = None
+        upperLinkedBlock: Union[Block, None] = None
+        block_list: List[Block] = self.a.getChildren()
         for otherBlk in block_list:
             if b.name != otherBlk.name:
                 if b.p.zbottom == otherBlk.p.ztop:
@@ -473,7 +491,7 @@ class AssemblyAxialLinkage:
                 single=True,
             )
 
-    def _getLinkedComponents(self, b, c):
+    def _getLinkedComponents(self, b: Block, c: Component):
         """Retrieve the axial linkage for component c.
 
         Parameters
@@ -488,7 +506,7 @@ class AssemblyAxialLinkage:
         RuntimeError
             multiple candidate components are found to be axially linked to a component
         """
-        lstLinkedC = [None, None]
+        lstLinkedC: List[Union[Component, None]] = [None, None]
         for ib, linkdBlk in enumerate(self.linkedBlocks[b]):
             if linkdBlk is not None:
                 for otherC in getSolidComponents(linkdBlk.getChildren()):
@@ -518,7 +536,7 @@ class AssemblyAxialLinkage:
             )
 
 
-def _determineLinked(componentA, componentB):
+def _determineLinked(componentA: Component, componentB: Component) -> bool:
     """Determine axial component linkage for two components.
 
     Parameters
@@ -583,12 +601,15 @@ def _determineLinked(componentA, componentB):
 class ExpansionData:
     """Object containing data needed for axial expansion."""
 
-    def __init__(self, a, setFuel: bool, expandFromTinputToThot: bool):
+    def __init__(self):
+        self.componentReferenceTemperature = {}
+        self._expansionFactors = {}
+        self._componentDeterminesBlockHeight = {}
+
+    def _setAssembly(self, a: Assembly, setFuel: bool, expandFromTinputToThot: bool):
         """
         Parameters
         ----------
-        a: :py:class:`Assembly <armi.reactor.assemblies.Assembly>`
-            Assembly to assign component-wise expansion data to
         setFuel: bool
             used to determine if fuel component should be set as
             axial expansion target component during initialization.
@@ -598,14 +619,11 @@ class ExpansionData:
             from c.inputTemperatureInC to c.temperatureInC (True) or some other
             reference temperature and c.temperatureInC (False)
         """
-        self._a = a
-        self.componentReferenceTemperature = {}
-        self._expansionFactors = {}
-        self._componentDeterminesBlockHeight = {}
-        self._setTargetComponents(setFuel)
+        self._a: Assembly = a
         self.expandFromTinputToThot = expandFromTinputToThot
+        self._setTargetComponents(setFuel)
 
-    def setExpansionFactors(self, componentLst: List, expFrac: List):
+    def setExpansionFactors(self, componentLst: List[Component], expFrac: List[float]):
         """Sets user defined expansion fractions.
 
         Parameters
@@ -639,14 +657,16 @@ class ExpansionData:
         for c, p in zip(componentLst, expFrac):
             self._expansionFactors[c] = p
 
-    def updateComponentTempsBy1DTempField(self, tempGrid, tempField):
+    def updateComponentTempsBy1DTempField(
+        self, tempGrid: List[float], tempField: List[float]
+    ):
         """Assign a block-average axial temperature to components.
 
         Parameters
         ----------
-        tempGrid : numpy array
+        tempGrid : List[float]
             1D axial temperature grid (i.e., physical locations where temp is stored)
-        tempField : numpy array
+        tempField : List[float]
             temperature values along grid
 
         Notes
@@ -685,7 +705,7 @@ class ExpansionData:
             for c in b:
                 self.updateComponentTemp(c, blockAveTemp)
 
-    def updateComponentTemp(self, c, temp: float):
+    def updateComponentTemp(self, c: Component, temp: float):
         """Update component temperatures with a provided temperature.
 
         Parameters
@@ -704,7 +724,7 @@ class ExpansionData:
         self.componentReferenceTemperature[c] = c.temperatureInC
         c.setTemperature(temp)
 
-    def computeThermalExpansionFactors(self):
+    def computeThermalExpansionFactors(self) -> None:
         """Computes expansion factors for all components via thermal expansion."""
         for b in self._a:
             for c in getSolidComponents(b):
@@ -722,7 +742,7 @@ class ExpansionData:
                     # so we'll assume that the expansion factor is 1.0.
                     self._expansionFactors[c] = 1.0
 
-    def getExpansionFactor(self, c):
+    def getExpansionFactor(self, c: Component):
         """Retrieves expansion factor for c.
 
         Parameters
@@ -733,7 +753,7 @@ class ExpansionData:
         value = self._expansionFactors.get(c, 1.0)
         return value
 
-    def _setTargetComponents(self, setFuel):
+    def _setTargetComponents(self, setFuel: bool):
         """Sets target component for each block.
 
         Parameters
@@ -756,14 +776,16 @@ class ExpansionData:
             else:
                 self.determineTargetComponent(b)
 
-    def determineTargetComponent(self, b, flagOfInterest=None):
+    def determineTargetComponent(
+        self, b: Block, flagOfInterest: Union[FlagType, None] = None
+    ) -> None:
         """Determines target component, stores it on the block, and appends it to self._componentDeterminesBlockHeight.
 
         Parameters
         ----------
         b : :py:class:`Block <armi.reactor.blocks.Block>`
             block to specify target component for
-        flagOfInterest : :py:class:`Flags <armi.reactor.flags.Flags>`
+        flagOfInterest : :py:class:`Flags <armi.reactor.flags.FlagType>`
             the flag of interest to identify the target component
 
         Notes
@@ -779,14 +801,15 @@ class ExpansionData:
         RuntimeError
             multiple target components found
         """
+        componentWFlag: List = []
         if flagOfInterest is None:
             # Follow expansion of most neutronically important component, fuel first then control/poison
             for targetFlag in TARGET_FLAGS_IN_PREFERRED_ORDER:
                 componentWFlag = [c for c in b.getChildren() if c.hasFlags(targetFlag)]
-                if componentWFlag != []:
+                if len(componentWFlag) > 0:
                     break
             # some blocks/components are not included in the above list but should still be found
-            if not componentWFlag:
+            if len(componentWFlag) == 0:
                 componentWFlag = [c for c in b.getChildren() if c.p.flags in b.p.flags]
         else:
             componentWFlag = [c for c in b.getChildren() if c.hasFlags(flagOfInterest)]
@@ -807,7 +830,7 @@ class ExpansionData:
         self._componentDeterminesBlockHeight[componentWFlag[0]] = True
         b.p.axialExpTargetComponent = componentWFlag[0].name
 
-    def _isFuelLocked(self, b):
+    def _isFuelLocked(self, b: Block):
         """Physical/realistic implementation reserved for ARMI plugin.
 
         Parameters
@@ -831,7 +854,7 @@ class ExpansionData:
         self._componentDeterminesBlockHeight[c] = True
         b.p.axialExpTargetComponent = c.name
 
-    def isTargetComponent(self, c):
+    def isTargetComponent(self, c: Component):
         """Returns bool if c is a target component.
 
         Parameters
