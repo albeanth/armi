@@ -390,77 +390,25 @@ class AssemblyAxialLinkage:
     a : :py:class:`Assembly <armi.reactor.assemblies.Assembly>`
         reference to original assembly; is directly modified/changed during expansion.
 
-    linkedBlocks : dict
-        keys   --> :py:class:`Block <armi.reactor.blocks.Block>`
+    linkedBlocks : dict[Block, List[Blocks]]
+        Keys: blocks. Values: list of axially linked blocks; index 0 = lower linked block; index 1: upper linked block.
 
-        values --> list of axially linked blocks; index 0 = lower linked block; index 1: upper linked block.
-
-        see also: self._getLinkedBlocks()
-
-    linkedComponents : dict
-        keys -->   :py:class:`Component <armi.reactor.components.component.Component>`
-
-        values --> list of axially linked components; index 0 = lower linked component; index 1: upper linked component.
-
-        see also: self._getLinkedComponents
+    linkedComponents : dict[Component, List[Component]]
+        Keys: components. Values: list of axially linked components; index 0 = lower linked component; index 1: upper linked component.
     """
 
     def __init__(self, StdAssem):
         self.a = StdAssem
-        self.pinnedBlocks = []
         self.linkedBlocks = {}
         self.linkedComponents = {}
         self._determineAxialLinkage()
 
     def _determineAxialLinkage(self):
         """Gets the block and component based linkage."""
-        # get the pinned blocks
-        self.pinnedBlocks = [b for b in self.a if b.spatialGrid]
-        # determine the index locations and max number of pin groupings in each pinned block
-        self.indexLocations = {}
-        numOfPinGroupingsPerBlock = []
-        for b in self.pinnedBlocks:
-            numPinGroups = self._getPinGroupings(b)
-            # store the length of pin groupings
-            numOfPinGroupingsPerBlock.append(numPinGroups)
-        self._checkProperPinGroupings(numOfPinGroupingsPerBlock)
         for b in self.a:
             self._getLinkedBlocks(b)
             for c in getSolidComponents(b):
                 self._getLinkedComponents(b, c)
-
-    def _getPinGroupings(self, b) -> float:
-        pinGroups = set()
-        for c in getSolidComponents(b):
-            if isinstance(c.spatialLocator, MultiIndexLocation):
-                ringPosConfirm = []
-                for index in c.spatialLocator.indices:
-                    try:
-                        ringPosConfirm.append(
-                            c.spatialLocator.grid.indicesToRingPos(index[0], index[1])
-                        )
-                    except AttributeError:
-                        # autogrids have None type for spatialLocator.grid
-                        ringPosConfirm.append(
-                            HexGrid.indicesToRingPos(index[0], index[1])
-                        )
-                ringPosConfirmSorted = tuple(
-                    sorted(ringPosConfirm, key=lambda x: (x[0], x[1]))
-                )
-                # store pin groupings
-                self.indexLocations[c] = ringPosConfirmSorted
-                pinGroups.add(ringPosConfirmSorted)
-        return len(pinGroups)
-
-    def _checkProperPinGroupings(self, numOfPinGroups: List):
-        # throw an error is the len of indexLocations isn't all the same
-        # you need to have the same number of pin groupings throughout an assembly for the
-        # grid linking to work
-        if numOfPinGroups and len(set(numOfPinGroups)) != 1:
-            raise RuntimeError(
-                "There needs to be the same number of pin groupings throughout an assembly."
-                f"{self.a}, {self.pinnedBlocks}, {numOfPinGroups}"
-            )
 
     def _getLinkedBlocks(self, b):
         """Retrieve the axial linkage for block b.
@@ -585,8 +533,8 @@ def _resolveMultipleLinkage(primary, candidate1, candidate2):
     return candidate1 if chooseC1 else candidate2
 
 
-def _determineLinked(componentA, componentB):
-    """Determine axial component linkage for two components.
+def _determineLinked(componentA, componentB) -> bool:
+    """Determine axial component linkage for two solid components.
 
     Parameters
     ----------
@@ -597,25 +545,29 @@ def _determineLinked(componentA, componentB):
 
     Notes
     -----
-    - Requires that shapes have the getCircleInnerDiameter and getBoundingCircleOuterDiameter defined
-    - For axial linkage to be True, components MUST be solids, the same Component Class, multiplicity, and meet inner
-      and outer diameter requirements.
-    - When component dimensions are retrieved, cold=True to ensure that dimensions are evaluated
-      at cold/input temperatures. At temperature, solid-solid interfaces in ARMI may produce
-      slight overlaps due to thermal expansion. Handling these potential overlaps are out of scope.
+    If componentA and componentB are both solids and the same type, geometric overlap can be checked via
+    getCircleInnerDiameter and getBoundingCircleOuterDiameter. Five different cases are accounted for.
+    If they do not meet these initial criteria, linkage is assumed to be False.
+    Case #1: Unshaped Components. There is no way to determine overlap so they're assumed to be not linked.
+    Case #2: Blocks with specified grids. If componentA and componentB share common grid indices (cannot be a partial
+    case, ALL of the indices must be contained by one or the other), then overlap can be checked.
+    Case #3: If Component position is not specified via a grid, the multiplicity is checked. If consistent, they are
+    assumed to be in the same positions and their overlap is checked.
+    Case #4: Cases 1-3 are not True so we assume there is no linkage.
+    Case #5: Components are either not both solids or are not the same type. These cannot be linked.
 
     Returns
     -------
     linked : bool
         status is componentA and componentB are axially linked to one another
     """
-    # if isinstance(componentA.spatialLocator, MultiIndexLocation) and isinstance(componentB.spatialLocator, MultiIndexLocation):
-    #     # do stuff!
-    #     print("")
-    if isinstance(componentA, type(componentB)) and (
-        componentA.getDimension("mult") == componentB.getDimension("mult")
+    if (
+        componentA.containsSolidMaterial()
+        and componentB.containsSolidMaterial()
+        and isinstance(componentA, type(componentB))
     ):
         if isinstance(componentA, UnshapedComponent):
+            ## Case 1 -- see docstring
             runLog.warning(
                 f"Components {componentA} and {componentB} are UnshapedComponents "
                 "and do not have 'getCircleInnerDiameter' or getBoundingCircleOuterDiameter methods; "
@@ -624,26 +576,66 @@ def _determineLinked(componentA, componentB):
                 single=True,
             )
             linked = False
-        else:
-            idA, odA = (
-                componentA.getCircleInnerDiameter(cold=True),
-                componentA.getBoundingCircleOuterDiameter(cold=True),
-            )
-            idB, odB = (
-                componentB.getCircleInnerDiameter(cold=True),
-                componentB.getBoundingCircleOuterDiameter(cold=True),
-            )
-
-            biggerID = max(idA, idB)
-            smallerOD = min(odA, odB)
-            if biggerID >= smallerOD:
-                # one object fits inside the other
-                linked = False
+        elif isinstance(componentA.spatialLocator, MultiIndexLocation) and isinstance(
+            componentB.spatialLocator, MultiIndexLocation
+        ):
+            ## Case 2 -- see docstring
+            componentAIndices = [
+                list(index) for index in componentA.spatialLocator.indices
+            ]
+            componentBIndices = [
+                list(index) for index in componentB.spatialLocator.indices
+            ]
+            # check for common indices between components. If either component has indices within its counterpart,
+            # then they are candidates to be linked and overlap should be checked.
+            if len(componentAIndices) < len(componentBIndices):
+                if all(index in componentBIndices for index in componentAIndices):
+                    linked = _checkOverlap(componentA, componentB)
+                else:
+                    linked = False
             else:
-                linked = True
+                if all(index in componentAIndices for index in componentBIndices):
+                    linked = _checkOverlap(componentA, componentB)
+                else:
+                    linked = False
+        elif componentA.getDimension("mult") == componentB.getDimension("mult"):
+            ## Case 3 -- see docstring
+            linked = _checkOverlap(componentA, componentB)
+        else:
+            ## Case 4 -- see docstring
+            linked = False
 
     else:
+        ## Case 5 -- see docstring
         linked = False
+
+    return linked
+
+
+def _checkOverlap(componentA, componentB) -> bool:
+    """Check two components for geometric overlap.
+
+    Notes
+    -----
+    When component dimensions are retrieved, cold=True to ensure that dimensions are evaluated
+    at cold/input temperatures. At temperature, solid-solid interfaces in ARMI may produce
+    slight overlaps due to thermal expansion. Handling these potential overlaps are out of scope.
+    """
+    idA, odA = (
+        componentA.getCircleInnerDiameter(cold=True),
+        componentA.getBoundingCircleOuterDiameter(cold=True),
+    )
+    idB, odB = (
+        componentB.getCircleInnerDiameter(cold=True),
+        componentB.getBoundingCircleOuterDiameter(cold=True),
+    )
+    biggerID = max(idA, idB)
+    smallerOD = min(odA, odB)
+    if biggerID >= smallerOD:
+        # one object fits inside the other
+        linked = False
+    else:
+        linked = True
 
     return linked
 
