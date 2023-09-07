@@ -53,7 +53,15 @@ class DummyPlugin1(plugins.ArmiPlugin):
                 description="The neutronics / depletion solver for global flux solve.",
                 enforcedOptions=True,
                 options=["DEFAULT", "OTHER"],
-            )
+            ),
+            setting.Setting(
+                "newListSetting",
+                default=["DEFAULT"],
+                label="Setting that is a list",
+                description="A description for a list-based setting",
+                options=["DEFAULT", "OTHER", "THIS", "THAT"],
+                enforcedOptions=True,
+            ),
         ]
 
 
@@ -237,6 +245,12 @@ assemblyRotationAlgorithm: buReducingAssemblyRotatoin
         cs = caseSettings.Settings()
 
         self.assertEqual(cs["extendableOption"], "DEFAULT")
+
+        # just setting newListSetting to what it already is fails in the
+        # schema check within voluptous.
+        # shows that we can't enforce schema for settings who are lists
+        cs["newListSetting"] = ["DEFAULT"]
+
         # We shouldn't have any settings from the other plugin, so this should be an
         # error.
         with self.assertRaises(vol.error.MultipleInvalid):
