@@ -40,6 +40,8 @@ from armi.utils.customExceptions import NonexistentSetting
 
 THIS_DIR = os.path.dirname(__file__)
 
+NEW_LIST_SETTING_OPTS = ["DEFAULT", "OTHER", "THIS", "THAT"]
+
 
 class DummyPlugin1(plugins.ArmiPlugin):
     @staticmethod
@@ -59,8 +61,11 @@ class DummyPlugin1(plugins.ArmiPlugin):
                 default=["DEFAULT"],
                 label="Setting that is a list",
                 description="A description for a list-based setting",
-                options=["DEFAULT", "OTHER", "THIS", "THAT"],
                 enforcedOptions=True,
+                schema=vol.Any(
+                    NEW_LIST_SETTING_OPTS,
+                    msg=f"One of the entries is invalid. Must be within {NEW_LIST_SETTING_OPTS}.",
+                ),
             ),
         ]
 
