@@ -321,11 +321,13 @@ class AxialExpansionChanger:
 
     @staticmethod
     def _getCompHeight(component) -> float:
-        """Get the component height, if doesn't exist, get parent block height."""
+        """Get the component height, if doesn't exist or is None, get parent block height."""
+        compHeight = component.parent.getHeight()
         try:
-            compHeight = component.height
+            if component.height:
+                compHeight = component.height
         except AttributeError:
-            compHeight = component.parent.getHeight()
+            pass
         return compHeight
 
     def manageCoreMesh(self, r):

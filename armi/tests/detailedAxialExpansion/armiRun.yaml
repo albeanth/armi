@@ -39,6 +39,6 @@ settings:
   power: 100000000.0
   summarizeAssemDesign: false
   targetK: 1.002
-  verbosity: extra
+  verbosity: debug
   versions:
     armi: uncontrolled
