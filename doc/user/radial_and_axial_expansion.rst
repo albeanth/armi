@@ -78,3 +78,114 @@ expand ARMI Components.
     :py:meth:`linearExpansionPercent <armi.materials.material.Material.linearExpansionPercent>` returns 
     :math:`\frac{L - L_0}{L_0}` in %.
 
+***************
+Axial Expansion
+***************
+
+Within ARMI, axial expansion is performed at the Component-level for a given Assembly through the 
+:py:class:`axialExpansionChanger <armi.reactor.converters.axialExpansionChanger.AxialExpansionChanger>`. The currently 
+recognized assumptions and limitations are as follows:
+
+1. Axial expansion is only supported for pin-type Assemblies and is done Assembly by Assembly.
+2. Axial expansion only occurs for solid materials.
+    i. Assembly coolant is assumed to be a :py:meth:`DerivedShape <armi.reactor.components.DerivedShape>` and whose
+       volume will be re-computed based on the expansion of the neighboring solid materials.
+
+From a high level, axial expansion within ARMI occurs in three steps. For a valid Assembly, 
+1. Determine axial linkage of Components between axially neighboring Blocks.
+2. Assign expansion factors to each Component. 
+   - Expansion factors are typically computed thermal expansion factors via
+     :py:meth:`computeThermalExpansionFactors <armi.reactor.converters.axialExpansionChanger.ExpansionData.computeThermalExpansionFactors>`.
+     However, predetermined expansion factors can be directly assigned to Components via 
+     :py:meth:`setExpansionFactors <armi.reactor.converters.axialExpansionChanger.ExpansionData.setExpansionFactors>`.
+3. Perform axial expansion.
+
+Steps 1 and 3 are described in the following sections (Step 2 is already discussed).
+
+Determining Component Axial Linkage
+-----------------------------------
+
+Prior to performing any expansion, the axial expansion functionality needs to understand the axial linkage of 
+Components between axially neighboring blocks. This is critical to preserving physical realism of axial expansion. 
+For example, consider the case of three axially neighboring blocks shown in Figure ABC_1.
+
+.. show figure with two prototypical Sodium-cooled fast reactor blocks and a Plenum Block
+.. this is essentially a piece of the detailedAxialExpansion test reactor
+
+To properly preserve reactivity feedback phenomena resulting from axial expansion, the fuel in the lower Block needs to 
+physically *push up* on the fuel pin above it pushing it into the Plenum Block. (analogously, the clad and duct need to 
+have similar movement). To accomplish this, the axial expansion changer performs the following:
+
+1. For a given Block, `B0`, determine the blocks that are axially linked to it by comparing the lower and upper bounds.
+2. For each solid component within `B0`, compare the solid components within each linked Block to determine if the 
+   solid components are linked. This determination is completed in the following manner:
+   i. The two components must be the same type (e.g., 
+      :py:class:`Circle <armi.reactor.components.basicShapes.Circle>`, 
+      :py:class:`Hexagon <armi.reactor.components.basicShapes.Hexagon>`, etc). 
+   ii. The two components must have the same multiplicity.
+
+During the determination of axial linkage, there is one user-facing warning and one fatal error. The warning is in 
+regard to :py:class:`UnshapedComponent <armi.reactor.components.UnshapedComponent>`. These types of components are 
+iodealized constructs that have no formal shape and therefore explictly axially linking them for axial expansion is 
+unphysical. The error is raised if a given component is found to be axially linked to multiple components. This is 
+typically indicative of an error in the blueprints, however, if this functionality is required, contact the ARMI 
+development team.
+
+Assigning Expansion Factors to Each Component
+---------------------------------------------
+
+- connect this to the thermal expansion methodology
+- describe the different use cases and options for thermal expansion
+- describe the prescribed expansion option 
+
+
+Axial Expansion Mechanics in ARMI
+---------------------------------
+
+**show figure here of two blocks expanding and the lower pushing up on the upper with uniform expansion**
+
+
+
+Using the `igniter fuel` Assembly from the test reactor blueprints provided in 
+`armi.tests.detailedAxialExpansion.refSmallReactorBase`, we can illustrate the logic used to determine axial linkage. 
+
+
+
+
+Non-Uniform Expansion
+---------------------
+In ARMI, axial linkage of the components 
+
+Figure XYZ above shows the simple case of uniform expansion. However, ind reality, each solid material may expand at 
+different rates due to varying material composition and/or temperatures. To accomodate this, the concept of a 
+"dummy" Block is introduced. The purpose of the dummy block is to allow 
+
+Control Assembly Expansion and Contraction
+------------------------------------------
+3. Assumptions and limitations of axial expansion for control assemblies is discussed in Section ABC.
+
+..
+.. OUTLINE 
+..
+.. Thermal Expansion 
+.. -----------------
+.. 1. Show thermal expansion equations. (done in doc/user/radial_and_thermal_expansion.rst)
+
+.. Axial Expansion Outline
+.. -----------------------
+.. 2. Describe how axial expansion occurs in an assembly. 
+..    - Component-wise expansion -> axial expansion target component -> how this 
+..      gets used to redraw block boundaries.
+..    - Drop a note for how prescribed expansion comes into play with the equations.
+..    - Appendix for control assemblies. Discuss how it does not account for
+..        CRDL expansion nor downward expansion. Provide the underlying assumption
+..        of how the pin bundle expansion should be used. 
+.. 3. Describe how to obtain mass conservation in axial expansion. Show cases where 
+..    it is lost and how to obtain it. 
+.. 4. Leave documentation connecting Assembly-based expansion to the uniform mesh
+..    converter. I.e., say that after looping over every Assembly in a given Core, 
+..    you'll have an axially disjoint Core that (likely) needs to be unified.  
+
+.. Radial Expansion Outline
+.. ------------------------
+.. 1. Discuss Component-based radial expansion and how radial component linking works.
