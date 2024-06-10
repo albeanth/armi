@@ -124,13 +124,19 @@ have similar movement). To accomplish this, the axial expansion changer performs
     :py:class:`Circle <armi.reactor.components.basicShapes.Circle>`,
     :py:class:`Hexagon <armi.reactor.components.basicShapes.Hexagon>`, etc).
     - The two components must have the same multiplicity.
+    - The two components must have geometrically overlap. This metric is quantied by computing the inner and outer
+      "diameter" of each component and checking to see if either component can fit within the other. The inner and 
+      outer "diameter" of each component is measured via the specific shape subclass implementation of
+      :py:meth:`getCircleInnerDiameter <armi.reactor.components.component.Component.getCircleInnerDiameter>`and 
+      :py:meth:`getBoundingCircleOuterDiameter <armi.reactor.components.component.Component.getBoundingCircleOuterDiameter>`
+      , respectively. **add a figure here showing some examples of what this looks like**
 
 During the determination of axial linkage, there is one user-facing warning and one fatal error. The warning is in 
 regard to :py:class:`UnshapedComponent <armi.reactor.components.UnshapedComponent>`. These types of components are 
 idealized constructs that have no formal shape and therefore explictly axially linking them for axial expansion is 
 unphysical. The error is raised if a given component is found to be axially linked to multiple components. This is 
-typically indicative of an error in the blueprints, however, if this functionality is required, contact the ARMI 
-development team.
+typically indicative of an error in the blueprints and occurs when there is overlap between multiple components. 
+Support for such designs may included in the future. 
 
 Assigning Expansion Factors to Each Component
 =============================================
