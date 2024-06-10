@@ -20,7 +20,7 @@ ARMI treats thermal expansion as a linear phenomena using the standard linear ex
 
 where, :math:`\Delta L` and :math:`\Delta T` are the change in length and temperature from the reference state, 
 respectively, and :math:`\alpha` is the thermal expansion coefficient relative to :math:`T_0`. Expanding and rearranging
- Equation :eq:`linearExp`, we can obtain an expression for the new length, :math:`L_1`,
+Equation :eq:`linearExp`, we can obtain an expression for the new length, :math:`L_1`,
 
 .. math::
     L_1 = L_0\left[1 + \alpha(T_1)\left(T_1 - T_0\right) \right].
@@ -88,22 +88,23 @@ recognized assumptions and limitations are as follows:
 
 1. Axial expansion is only supported for pin-type Assemblies and is done Assembly by Assembly.
 2. Axial expansion only occurs for solid materials.
-    i. Assembly coolant is assumed to be a :py:meth:`DerivedShape <armi.reactor.components.DerivedShape>` and whose
-       volume will be re-computed based on the expansion of the neighboring solid materials.
+    * Assembly coolant is assumed to be a :py:meth:`DerivedShape <armi.reactor.components.DerivedShape>` and whose
+      volume will be re-computed based on the expansion of the neighboring solid materials.
 
 From a high level, axial expansion within ARMI occurs in three steps. For a valid Assembly, 
+
 1. Determine axial linkage of Components between axially neighboring Blocks.
 2. Assign expansion factors to each Component. 
-   - Expansion factors are typically computed thermal expansion factors via
-     :py:meth:`computeThermalExpansionFactors <armi.reactor.converters.axialExpansionChanger.ExpansionData.computeThermalExpansionFactors>`.
-     However, predetermined expansion factors can be directly assigned to Components via 
-     :py:meth:`setExpansionFactors <armi.reactor.converters.axialExpansionChanger.ExpansionData.setExpansionFactors>`.
+    * Expansion factors are typically computed thermal expansion factors via
+      :py:meth:`computeThermalExpansionFactors <armi.reactor.converters.axialExpansionChanger.ExpansionData.computeThermalExpansionFactors>`.
+      However, predetermined expansion factors can be directly assigned to Components via
+      :py:meth:`setExpansionFactors <armi.reactor.converters.axialExpansionChanger.ExpansionData.setExpansionFactors>`.
 3. Perform axial expansion.
 
 Steps 1 and 3 are described in the following sections (Step 2 is already discussed).
 
 Determining Component Axial Linkage
------------------------------------
+===================================
 
 Prior to performing any expansion, the axial expansion functionality needs to understand the axial linkage of 
 Components between axially neighboring blocks. This is critical to preserving physical realism of axial expansion. 
@@ -119,20 +120,20 @@ have similar movement). To accomplish this, the axial expansion changer performs
 1. For a given Block, `B0`, determine the blocks that are axially linked to it by comparing the lower and upper bounds.
 2. For each solid component within `B0`, compare the solid components within each linked Block to determine if the 
    solid components are linked. This determination is completed in the following manner:
-   i. The two components must be the same type (e.g., 
-      :py:class:`Circle <armi.reactor.components.basicShapes.Circle>`, 
-      :py:class:`Hexagon <armi.reactor.components.basicShapes.Hexagon>`, etc). 
-   ii. The two components must have the same multiplicity.
+    - The two components must be the same type (e.g.,
+    :py:class:`Circle <armi.reactor.components.basicShapes.Circle>`,
+    :py:class:`Hexagon <armi.reactor.components.basicShapes.Hexagon>`, etc).
+    - The two components must have the same multiplicity.
 
 During the determination of axial linkage, there is one user-facing warning and one fatal error. The warning is in 
 regard to :py:class:`UnshapedComponent <armi.reactor.components.UnshapedComponent>`. These types of components are 
-iodealized constructs that have no formal shape and therefore explictly axially linking them for axial expansion is 
+idealized constructs that have no formal shape and therefore explictly axially linking them for axial expansion is 
 unphysical. The error is raised if a given component is found to be axially linked to multiple components. This is 
 typically indicative of an error in the blueprints, however, if this functionality is required, contact the ARMI 
 development team.
 
 Assigning Expansion Factors to Each Component
----------------------------------------------
+=============================================
 
 - connect this to the thermal expansion methodology
 - describe the different use cases and options for thermal expansion
@@ -140,7 +141,7 @@ Assigning Expansion Factors to Each Component
 
 
 Axial Expansion Mechanics in ARMI
----------------------------------
+=================================
 
 **show figure here of two blocks expanding and the lower pushing up on the upper with uniform expansion**
 
@@ -153,7 +154,8 @@ Using the `igniter fuel` Assembly from the test reactor blueprints provided in
 
 
 Non-Uniform Expansion
----------------------
+=====================
+
 In ARMI, axial linkage of the components 
 
 Figure XYZ above shows the simple case of uniform expansion. However, ind reality, each solid material may expand at 
@@ -161,8 +163,9 @@ different rates due to varying material composition and/or temperatures. To acco
 "dummy" Block is introduced. The purpose of the dummy block is to allow 
 
 Control Assembly Expansion and Contraction
-------------------------------------------
-3. Assumptions and limitations of axial expansion for control assemblies is discussed in Section ABC.
+==========================================
+
+Assumptions and limitations of axial expansion for control assemblies is discussed in Section ABC.
 
 ..
 .. OUTLINE 
