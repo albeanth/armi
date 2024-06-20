@@ -83,25 +83,30 @@ Axial Expansion
 ***************
 
 Within ARMI, axial expansion is performed at the Component-level for a given Assembly through the 
-:py:class:`axialExpansionChanger <armi.reactor.converters.axialExpansionChanger.AxialExpansionChanger>`. The currently 
+:py:class:`axialExpansionChanger <armi.reactor.converters.axialExpansionChanger.AxialExpansionChanger>`. The 
 recognized assumptions and limitations are as follows:
 
-1. Axial expansion is only supported for pin-type Assemblies and is done Assembly by Assembly.
+1. Axial expansion is only supported for pin-type Assemblies and is done Assembly-by-Assembly.
 2. Axial expansion only occurs for solid materials.
     * Assembly coolant is assumed to be a :py:meth:`DerivedShape <armi.reactor.components.DerivedShape>` and whose
-      volume will be re-computed based on the expansion of the neighboring solid materials.
+      volume is recomputed based on the expansion of the neighboring solid materials.
+    * Axial expansion of other fluid-based materials is neglected at this time. 
 
-From a high level, axial expansion within ARMI occurs in three steps. For a valid Assembly, 
+At a high level, axial expansion within ARMI occurs in three steps: 
 
 1. Determine axial linkage of Components between axially neighboring Blocks.
-2. Assign expansion factors to each Component. 
+2. Assign expansion factors to each solid Component. 
     * Expansion factors are typically computed thermal expansion factors via
       :py:meth:`computeThermalExpansionFactors <armi.reactor.converters.axialExpansionChanger.ExpansionData.computeThermalExpansionFactors>`.
-      However, predetermined expansion factors can be directly assigned to Components via
+      However, predetermined expansion factors may be directly assigned to Components via
       :py:meth:`setExpansionFactors <armi.reactor.converters.axialExpansionChanger.ExpansionData.setExpansionFactors>`.
 3. Perform axial expansion.
 
-Steps 1 and 3 are described in the following sections (Step 2 is already discussed).
+Steps 1 and 3 are described in Sections :ref:`axialLinkage` and :ref:`axialExp`, respectively. Section 
+:ref:`thermalExpansion` describes how thermal expansion coefficients are calculated and :ref:`assigningExpFactors` 
+describes the different use cases and how to perform prescribed expansion. 
+
+.. _axialLinkage:
 
 Determining Component Axial Linkage
 ===================================
@@ -138,6 +143,8 @@ unphysical. The error is raised if a given component is found to be axially link
 typically indicative of an error in the blueprints and occurs when there is overlap between multiple components. 
 Support for such designs may included in the future. 
 
+.. _assigningExpFactors:
+
 Assigning Expansion Factors to Each Component
 =============================================
 
@@ -145,6 +152,8 @@ Assigning Expansion Factors to Each Component
 - describe the different use cases and options for thermal expansion
 - describe the prescribed expansion option 
 
+
+.. _axialExp:
 
 Axial Expansion Mechanics in ARMI
 =================================
