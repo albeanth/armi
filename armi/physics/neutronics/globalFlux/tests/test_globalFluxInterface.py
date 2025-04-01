@@ -28,7 +28,7 @@ from armi.reactor import geometry
 from armi.reactor.blocks import HexBlock
 from armi.reactor.flags import Flags
 from armi.reactor.tests import test_blocks, test_reactors
-from armi.tests import ISOAA_PATH
+from armi.tests import ISOTXS_PATH
 
 
 class MockReactorParams:
@@ -355,14 +355,12 @@ class TestGlobalFluxResultMapper(unittest.TestCase):
     """
 
     def test_mapper(self):
-        # Switch to MC2v2 setting to make sure the isotopic/elemental expansions are compatible with
-        # actually doing some math using the ISOAA test microscopic library
         o, r = test_reactors.loadTestReactor(
             customSettings={CONF_XS_KERNEL: "MC2v2"},
             inputFileName="smallestTestReactor/armiRunSmallest.yaml",
         )
         applyDummyFlux(r)
-        r.core.lib = isotxs.readBinary(ISOAA_PATH)
+        r.core.lib = isotxs.readBinary(ISOTXS_PATH)
         mapper = globalFluxInterface.GlobalFluxResultMapper(cs=o.cs)
         mapper.r = r
         mapper._renormalizeNeutronFluxByBlock(100)

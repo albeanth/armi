@@ -30,7 +30,7 @@ from armi.reactor import geometry, grids, reactors
 
 TEST_ROOT = os.path.dirname(os.path.abspath(__file__))
 ARMI_RUN_PATH = os.path.join(TEST_ROOT, "armiRun.yaml")
-ISOAA_PATH = os.path.join(TEST_ROOT, "ISOAA")
+ISOTXS_PATH = os.path.join(TEST_ROOT, "ISOTXS")
 COMPXS_PATH = os.path.join(TEST_ROOT, "COMPXS.ascii")
 
 

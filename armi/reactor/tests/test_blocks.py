@@ -38,7 +38,7 @@ from armi.reactor.components import basicShapes, complexShapes
 from armi.reactor.flags import Flags
 from armi.reactor.tests.test_assemblies import makeTestAssembly
 from armi.testing import loadTestReactor
-from armi.tests import ISOAA_PATH, TEST_ROOT
+from armi.tests import ISOTXS_PATH, TEST_ROOT
 from armi.utils import densityTools, hexagon, units
 from armi.utils.directoryChangers import TemporaryDirectoryChanger
 from armi.utils.units import (
@@ -293,7 +293,7 @@ def applyDummyData(block):
         1348809158.0353086,
         601494405.293505,
     ]
-    xslib = isotxs.readBinary(ISOAA_PATH)
+    xslib = isotxs.readBinary(ISOTXS_PATH)
     # slight hack here because the test block was created
     # by hand rather than via blueprints and so elemental expansion
     # of isotopics did not occur. But, the ISOTXS library being used
@@ -1978,7 +1978,7 @@ class Block_TestCase(unittest.TestCase):
         assembly = makeTestAssembly(1, 1, r=r)
         assembly.add(block)
         r.core.add(assembly)
-        r.core.lib = isotxs.readBinary(ISOAA_PATH)
+        r.core.lib = isotxs.readBinary(ISOTXS_PATH)
         block.p.mgFlux = 1
 
         self.assertAlmostEqual(

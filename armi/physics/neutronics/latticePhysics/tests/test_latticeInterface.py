@@ -31,7 +31,7 @@ from armi.reactor.assemblies import (
 )
 from armi.reactor.reactors import Core, Reactor
 from armi.reactor.tests.test_blocks import buildSimpleFuelBlock
-from armi.tests import ISOAA_PATH, mockRunLogs
+from armi.tests import ISOTXS_PATH, mockRunLogs
 
 
 # As an interface, LatticePhysicsInterface must be subclassed to be used
@@ -256,7 +256,7 @@ class TestLatticePhysicsLibraryCreation(TestLatticePhysicsInterfaceBase):
         )
         self.assembly[0].p.xsType = "A"
         self.o.cs[CONF_GEN_XS] = ""
-        self.o.r.core.lib = isotxs.readBinary(ISOAA_PATH)
+        self.o.r.core.lib = isotxs.readBinary(ISOTXS_PATH)
 
     def test_libCreation_NoGenXS(self):
         """No ISOTXS and xs gen not requested."""

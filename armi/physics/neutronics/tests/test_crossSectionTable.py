@@ -25,7 +25,7 @@ from armi.physics.neutronics.latticePhysics import ORDER
 from armi.reactor.tests.test_blocks import loadTestBlock
 from armi.settings import Settings
 from armi.testing import loadTestReactor
-from armi.tests import ISOAA_PATH
+from armi.tests import ISOTXS_PATH
 
 
 class TestCrossSectionTable(unittest.TestCase):
@@ -39,7 +39,7 @@ class TestCrossSectionTable(unittest.TestCase):
         obj = loadTestBlock()
         obj.p.mgFlux = range(33)
         core = obj.parent.parent
-        core.lib = isotxs.readBinary(ISOAA_PATH)
+        core.lib = isotxs.readBinary(ISOTXS_PATH)
         table = crossSectionTable.makeReactionRateTable(obj)
 
         self.assertEqual(len(obj.getNuclides()), len(table))

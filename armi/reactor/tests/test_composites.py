@@ -29,7 +29,7 @@ from armi.reactor.composites import getReactionRateDict
 from armi.reactor.flags import Flags, TypeSpec
 from armi.reactor.tests.test_blocks import loadTestBlock
 from armi.testing import loadTestReactor
-from armi.tests import ISOAA_PATH, mockRunLogs
+from armi.tests import ISOTXS_PATH, mockRunLogs
 
 
 class MockBP:
@@ -361,7 +361,7 @@ class TestCompositePattern(unittest.TestCase):
         _o, r = loadTestReactor(
             inputFileName="smallestTestReactor/armiRunSmallest.yaml"
         )
-        lib = nuclearDataIO.isotxs.readBinary(ISOAA_PATH)
+        lib = nuclearDataIO.isotxs.readBinary(ISOTXS_PATH)
         r.core.lib = lib
 
         # test on a Component
@@ -860,7 +860,7 @@ class TestMiscMethods(unittest.TestCase):
 
 class TestGetReactionRateDict(unittest.TestCase):
     def test_getReactionRateDict(self):
-        lib = nuclearDataIO.isotxs.readBinary(ISOAA_PATH)
+        lib = nuclearDataIO.isotxs.readBinary(ISOTXS_PATH)
         rxRatesDict = getReactionRateDict(
             nucName="PU239", lib=lib, xsSuffix="AA", mgFlux=1, nDens=1
         )

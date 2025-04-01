@@ -31,7 +31,7 @@ from armi.nuclearDataIO.cccc import isotxs
 from armi.reactor import assemblies, blocks, geometry, grids, reactors
 from armi.reactor.components import Circle, DerivedShape, Hexagon
 from armi.reactor.flags import Flags
-from armi.tests import ISOAA_PATH
+from armi.tests import ISOTXS_PATH
 
 configure(permissive=True)
 
@@ -105,7 +105,7 @@ def createDummyReactor():
 r = createDummyReactor()
 
 # Add an example cross section library to the reactor core
-r.core.lib = isotxs.readBinary(ISOAA_PATH)
+r.core.lib = isotxs.readBinary(ISOTXS_PATH)
 
 b = r.core.getFirstBlock(Flags.FUEL)
 b.expandElementalToIsotopics(nuclideBases.byName["NA"])

@@ -26,11 +26,11 @@ import matplotlib.pyplot as plt
 from armi import configure
 from armi.nuclearDataIO import xsNuclides
 from armi.nuclearDataIO.cccc import isotxs
-from armi.tests import ISOAA_PATH
+from armi.tests import ISOTXS_PATH
 
 configure(permissive=True)
 
-lib = isotxs.readBinary(ISOAA_PATH)
+lib = isotxs.readBinary(ISOTXS_PATH)
 
 u235 = lib.getNuclide("U235", "AA")
 xsNuclides.plotScatterMatrix(u235.micros.inelasticScatter, "U-235 inelastic")

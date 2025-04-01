@@ -23,12 +23,12 @@ import matplotlib.pyplot as plt
 from armi import configure
 from armi.nuclearDataIO.cccc import isotxs
 from armi.physics.neutronics import energyGroups
-from armi.tests import ISOAA_PATH
+from armi.tests import ISOTXS_PATH
 
 configure(permissive=True)
 
 gs = energyGroups.getGroupStructure("ANL33")
-lib = isotxs.readBinary(ISOAA_PATH)
+lib = isotxs.readBinary(ISOTXS_PATH)
 
 fe56 = lib.getNuclide("FE", "AA")
 u235 = lib.getNuclide("U235", "AA")

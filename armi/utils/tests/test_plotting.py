@@ -23,7 +23,7 @@ from armi.nuclearDataIO.cccc import isotxs
 from armi.reactor import blueprints, reactors
 from armi.reactor.flags import Flags
 from armi.reactor.tests import test_reactors
-from armi.tests import ISOAA_PATH, TEST_ROOT
+from armi.tests import ISOTXS_PATH, TEST_ROOT
 from armi.utils import plotting
 from armi.utils.directoryChangers import TemporaryDirectoryChanger
 
@@ -84,7 +84,7 @@ class TestPlotting(unittest.TestCase):
 
     def test_plotBlockFlux(self):
         with TemporaryDirectoryChanger():
-            xslib = isotxs.readBinary(ISOAA_PATH)
+            xslib = isotxs.readBinary(ISOTXS_PATH)
             self.r.core.lib = xslib
 
             blockList = self.r.core.getBlocks()

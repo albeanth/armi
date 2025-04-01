@@ -25,7 +25,7 @@ from armi.reactor.flags import Flags
 from armi.reactor.tests import test_assemblies, test_blocks
 from armi.settings.fwSettings.globalSettings import CONF_UNIFORM_MESH_MINIMUM_SIZE
 from armi.testing import loadTestReactor, reduceTestReactorRings
-from armi.tests import ISOAA_PATH, TEST_ROOT
+from armi.tests import ISOTXS_PATH, TEST_ROOT
 
 
 class DummyFluxOptions:
@@ -226,7 +226,7 @@ class TestUniformMeshGenerator(unittest.TestCase):
         }
         cls.o, cls.r = loadTestReactor(TEST_ROOT, customSettings=newSettings)
         reduceTestReactorRings(cls.r, cls.o.cs, 5)
-        cls.r.core.lib = isotxs.readBinary(ISOAA_PATH)
+        cls.r.core.lib = isotxs.readBinary(ISOTXS_PATH)
 
         # make the mesh a little non-uniform
         a4 = cls.r.core[4]
@@ -340,7 +340,7 @@ class TestUniformMeshComponents(unittest.TestCase):
             TEST_ROOT, customSettings={CONF_XS_KERNEL: "MC2v2"}
         )
         reduceTestReactorRings(cls.r, cls.o.cs, 4)
-        cls.r.core.lib = isotxs.readBinary(ISOAA_PATH)
+        cls.r.core.lib = isotxs.readBinary(ISOTXS_PATH)
 
         # make the mesh a little non-uniform
         a = cls.r.core[4]
@@ -402,7 +402,7 @@ class TestUniformMesh(unittest.TestCase):
             TEST_ROOT, customSettings={CONF_XS_KERNEL: "MC2v2"}
         )
         reduceTestReactorRings(self.r, self.o.cs, 3)
-        self.r.core.lib = isotxs.readBinary(ISOAA_PATH)
+        self.r.core.lib = isotxs.readBinary(ISOTXS_PATH)
         self.r.core.p.keff = 1.0
 
         self.converter = uniformMesh.NeutronicsUniformMeshConverter(
@@ -539,7 +539,7 @@ class TestGammaUniformMesh(unittest.TestCase):
         self.o, self.r = loadTestReactor(
             TEST_ROOT, customSettings={CONF_XS_KERNEL: "MC2v2"}
         )
-        self.r.core.lib = isotxs.readBinary(ISOAA_PATH)
+        self.r.core.lib = isotxs.readBinary(ISOTXS_PATH)
         self.r.core.p.keff = 1.0
         self.converter = uniformMesh.GammaUniformMeshConverter(cs=self.o.cs)
 
@@ -732,7 +732,7 @@ class TestUniformMeshNonUniformAssemFlags(unittest.TestCase):
                 "nonUniformAssemFlags": ["primary control"],
             },
         )
-        self.r.core.lib = isotxs.readBinary(ISOAA_PATH)
+        self.r.core.lib = isotxs.readBinary(ISOTXS_PATH)
         self.r.core.p.keff = 1.0
         self.converter = uniformMesh.NeutronicsUniformMeshConverter(
             cs=self.o.cs, calcReactionRates=True

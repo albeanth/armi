@@ -22,7 +22,7 @@ from armi.physics.neutronics.macroXSGenerationInterface import (
 )
 from armi.settings import Settings
 from armi.testing import loadTestReactor
-from armi.tests import ISOAA_PATH
+from armi.tests import ISOTXS_PATH
 
 
 class TestMacroXSGenerationInterface(unittest.TestCase):
@@ -48,7 +48,7 @@ class TestMacroXSGenerationInterface(unittest.TestCase):
         self.assertEqual(i.name, "macroXsGen")
 
         # Mock up a nuclide library
-        mockLib = isotxs.readBinary(ISOAA_PATH)
+        mockLib = isotxs.readBinary(ISOTXS_PATH)
         mockLib.__dict__["_nuclides"] = defaultdict(
             lambda: mockLib.__dict__["_nuclides"]["CAA"], mockLib.__dict__["_nuclides"]
         )
