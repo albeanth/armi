@@ -100,7 +100,7 @@ decay and transmutation modes).
 
 Nuclide names, labels, and IDs
 ------------------------------
-Nuclides have names, labels and IDs. 
+Nuclides have names, labels and IDs.
 
 :py:attr:`INuclide.name <armi.nucDirectory.nuclideBases.INuclide.name>`
     The nuclide name is what *should* be used within ARMI itself. This is a human readable name
@@ -108,14 +108,14 @@ Nuclides have names, labels and IDs.
     from the corresponding element symbol and mass number (A).
 
 :py:attr:`INuclide.label <armi.nucDirectory.nuclideBases.INuclide.label>`
-    The nuclide label is a unique 4 character name which identifies the nuclide from all others. 
+    The nuclide label is a unique 4 character name which identifies the nuclide from all others.
     The label is fixed to 4 characters to conform with the CCCC standard files, which traditionally
     only allow for a maximum of 6 character labels in legacy nuclear codes. Of the 6 allowable
     characters, 4 are reserved for the unique identifier of the nuclide and 2 characters are reserved
     for cross section labels (i.e., AA, AB, ZA, etc.). The cross section labels are based on the
-    cross section group manager implementation within the framework. These labels are not necessarily 
-    human readable/interpretable, but are generally the nuclide symbol followed by the last two digits 
-    of the mass number (A), so the nuclide for U235 has the label ``U235``, but PU239 has the label 
+    cross section group manager implementation within the framework. These labels are not necessarily
+    human readable/interpretable, but are generally the nuclide symbol followed by the last two digits
+    of the mass number (A), so the nuclide for U235 has the label ``U235``, but PU239 has the label
     ``PU39``.
 
 For reference, there is a complete list of the nuclides along with the names, labels and IDs
@@ -128,7 +128,7 @@ There are three main ways to retrieve a nuclide, which are provided for convenie
 what information you have, or "know," about a nuclide. For example, if you know a nuclide name, use
 the :py:data:`~armi.nucDirectory.nuclideBases.byName` dictionary. There are also dictionaries
 available for retrieving by the label, :py:data:`~armi.nucDirectory.nuclideBases.byLabel`, and by
-other software-specific IDs (i.e., MCNP, Serpent, MC2-2, and MC2-3). The software-specific labels
+other software-specific IDs (i.e., MCNP, Serpent, and MC2-3). The software-specific labels
 are incorporated into the framework to support plugin developments and may be extended as needed
 by end-users as needs arise.
 
@@ -141,11 +141,10 @@ Just like with elements, the item retrieved from the various dictionaries are th
 
     >>> tinFromName = nuclideBases.byName['SN112']
     >>> tinFromLabel = nuclideBases.byLabel['SN112']
-    >>> tinFromMcc2Id = nuclideBases.byName['SN1125']
     >>> tinFromMcc3Id = nuclideBases.byLabel['SN1127']
-    >>> tinFromName == tinFromLabel == tinFromMcc2Id == tinFromMcc3Id
+    >>> tinFromName == tinFromLabel == tinFromMcc3Id
     True
-    >>> id(tinFromName) == id(tinFromLabel) == id(tinFromMcc2Id) == id(tinFromMcc3Id)
+    >>> id(tinFromName) == id(tinFromLabel) == id(tinFromMcc3Id)
     True
 
 .. warning::

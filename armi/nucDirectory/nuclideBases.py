@@ -47,7 +47,6 @@ framework and applications.
     * ``byName`` (keyed by name, e.g., ``U235``)
     * ``byDBName`` (keyed by database name, e.g., ``nU235``)
     * ``byLabel`` (keyed by label, e.g., ``U235``)
-    * ``byMcc2Id`` (keyed by MC\ :sup:`2`-2 ID, e.g., ``U-2355``)
     * ``byMcc3Id`` (keyed by MC\ :sup:`2`-3 ID, e.g., ``U235_7``)
     * ``byMcc3IdEndfbVII0`` (keyed by MC\ :sup:`2`-3 ID, e.g., ``U235_7``)
     * ``byMcc3IdEndfbVII1`` (keyed by MC\ :sup:`2`-3 ID, e.g., ``U235_7``)
@@ -71,11 +70,6 @@ Examples
 <NuclideBase U235:  Z:92, A:235, S:0, W:2.350439e+02, Label:U235>, HL:2.22160758861e+16, Abund:7.204000e-03>
 
 >>> nuclideBases.byLabel['U235']
-<NuclideBase U235:  Z:92, A:235, S:0, W:2.350439e+02, Label:U235>, HL:2.22160758861e+16, Abund:7.204000e-03>
-
-Retrieve U-235 by the MC2-2 ID:
-
->>> nuclideBases.byMcc2Id['U-2355']
 <NuclideBase U235:  Z:92, A:235, S:0, W:2.350439e+02, Label:U235>, HL:2.22160758861e+16, Abund:7.204000e-03>
 
 Retrieve U-235 by the MC2-3 ID:
@@ -1307,20 +1301,18 @@ def __addLumpedFissionProductNuclideBases():
 
 
 def readMCCNuclideData():
-    r"""Read in the label data for the MC2-2 and MC2-3 cross section codes to the nuclide bases.
+    r"""Read in the label data for the MC2-3 cross section code to the nuclide bases.
 
     .. impl:: Separating MCC data from code.
         :id: I_ARMI_ND_DATA1
         :implements: R_ARMI_ND_DATA
 
         This function reads the mcc-nuclides.yaml file from the ARMI resources
-        folder. This file contains the MC\ :sup:`2`-2 ID (from ENDF/B-V.2) and MC\ :sup:`2`-3 ID
-        (from ENDF/B-VII.0) for all nuclides in MC\ :sup:`2`. The ``mcc2id``,
-        ``mcc3idEndfVII0``, and  ``mcc3idEndfVII1`` attributes of each :py:class:`NuclideBase
-        <armi.nucDirectory.nuclideBases.NuclideBase>` instance are updated as
-        the data is read, and the global dictionaries ``byMcc2Id``
-        ``byMcc3IdEndfVII0`` and ``byMcc3IdEndfVII1`` are populated with the nuclide bases
-        keyed by their corresponding ID for each code.
+        folder. This file contains MC\ :sup:`2`-3 ID (from ENDF/B-VII.0) for all nuclides
+        in MC\ :sup:`2`. The ``mcc3idEndfVII0`` and  ``mcc3idEndfVII1`` attributes of each
+        :py:class:`NuclideBase <armi.nucDirectory.nuclideBases.NuclideBase>` instance are updated as
+        the data is read, and the global dictionaries ``byMcc3IdEndfVII0`` and ``byMcc3IdEndfVII1``
+        are populated with the nuclide bases keyed by their corresponding ID for each code.
     """
     global byMcc2Id
     global byMcc3Id

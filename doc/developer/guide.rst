@@ -174,7 +174,7 @@ like this::
     [R 0] 02  ReportInterface    report       Yes     No   Reversed
     [R 0] 03  FuelHandler        fuelHandler  Yes     No   Normal
     [R 0] 04  Depletion          depletion    Yes     Yes  Normal
-    [R 0] 05  MC2-2              mc2          Yes     No   Normal
+    [R 0] 05  MC2-3              mc3          Yes     No   Normal
     [R 0] 06  DIF3D              dif3d        Yes     No   Normal
     [R 0] 07  Thermo             thermo       Yes     No   Normal
     [R 0] 08  OrificedOptimized  orificer     Yes     Yes  Normal
