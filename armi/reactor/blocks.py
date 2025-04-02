@@ -1343,8 +1343,11 @@ class Block(composites.Composite):
 
         numDensities = self.getNumberDensities()
 
-        # vol = self.getVolume()
         for nucName, nDen in numDensities.items():
+            # can skip nuclides that have a 0.0 number density
+            # as they will have no contribution since they don't exist
+            if nDen == 0.0:
+                continue
             nucMc = nuclideBases.byName[nucName].label + self.getMicroSuffix()
             if gamma:
                 micros = lib[nucMc].gammaXS

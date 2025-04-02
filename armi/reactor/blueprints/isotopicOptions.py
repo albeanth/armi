@@ -514,7 +514,6 @@ def eleExpandInfoBasedOnCodeENDF(cs):
     endf70Elementals = [nuclideBases.byName[name] for name in ["C", "V", "ZN"]]
     endf71Elementals = [nuclideBases.byName[name] for name in ["C"]]
     endf80Elementals = []
-    elementalsInMC2 = set()
     expansionStrings = {}
     mc2Expansions = {
         "HE": ["HE4"],  # neglect HE3
@@ -523,25 +522,13 @@ def eleExpandInfoBasedOnCodeENDF(cs):
     }
     mcnpExpansions = {"O": ["O16"]}
 
-    for element in elements.byName.values():
-        # any NaturalNuclideBase that's available in MC2 libs
-        nnb = nuclideBases.byName.get(element.symbol)
-        if nnb and nnb.getMcc2Id():
-            elementalsInMC2.add(nnb)
-
     if "MCNP" in cs[CONF_NEUTRONICS_KERNEL]:
         expansionStrings.update(mcnpExpansions)
-        if cs[CONF_MCNP_LIB_BASE] == "ENDF/B-V.0":
-            # ENDF/B V.0
-            elementalsToKeep.update(nuclideBases.instances)  # skip expansion
-        elif cs[CONF_MCNP_LIB_BASE] == "ENDF/B-VII.0":
-            # ENDF/B VII.0
+        if cs[CONF_MCNP_LIB_BASE] == "ENDF/B-VII.0":
             elementalsToKeep.update(endf70Elementals)
         elif cs[CONF_MCNP_LIB_BASE] == "ENDF/B-VII.1":
-            # ENDF/B VII.1
             elementalsToKeep.update(endf71Elementals)
         elif cs[CONF_MCNP_LIB_BASE] == "ENDF/B-VIII.0":
-            # ENDF/B VIII.0
             elementalsToKeep.update(endf80Elementals)
         else:
             raise InputError(
@@ -573,11 +560,6 @@ def eleExpandInfoBasedOnCodeENDF(cs):
             raise ValueError(
                 f"Unrecognized DRAGLIB name: {dragLib} Use default file name."
             )
-
-    elif cs[CONF_XS_KERNEL] == "MC2v2":
-        # strip out any NaturalNuclideBase with no getMcc2Id() (not on mcc-nuclides.yaml)
-        elementalsToKeep.update(elementalsInMC2)
-        expansionStrings.update(mc2Expansions)
 
     # convert convenient string notation to actual NuclideBase objects
     expansions = {}

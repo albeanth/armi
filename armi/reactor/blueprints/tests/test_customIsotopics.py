@@ -283,7 +283,7 @@ blocks:
             <<: *basic_fuel
             material: UraniumOxide
             isotopics: bad uranium isotopic mass fractions
-    
+
     no density uo2: &block_5
         fuel:
             <<: *basic_fuel
@@ -300,7 +300,7 @@ assemblies:
         xs types: [A, A, A]
         material modifications:
             TD_frac: ["", "", ""]
-    
+
     fuel b: &assembly_b
         specifier: IC
         blocks: [*block_0, *block_3, *block_2]
@@ -338,14 +338,14 @@ assemblies:
         cs = settings.Settings()
         cs = cs.modified(
             newSettings={
-                CONF_XS_KERNEL: "MC2v2",
+                CONF_XS_KERNEL: "MC2v3",
                 "inputHeightsConsideredHot": False,
             }
         )
 
         cls.bp = blueprints.Blueprints.load(cls.yamlString)
         cls.a = cls.bp.constructAssem(cs, name="fuel a")
-        cls.numUZrNuclides = 29  # Number of nuclides defined `nuclide flags`
+        cls.numUZrNuclides = 33  # Number of nuclides defined `nuclide flags`
         cls.numCustomNuclides = (
             28  # Number of nuclides defined in `nuclide flags` without Zr
         )
@@ -447,7 +447,7 @@ assemblies:
 
             # rebuild the input to capture the logs
             cs = settings.Settings()
-            cs = cs.modified(newSettings={CONF_XS_KERNEL: "MC2v2"})
+            cs = cs.modified(newSettings={CONF_XS_KERNEL: "MC2v3"})
             bp = blueprints.Blueprints.load(self.yamlString)
             bp.constructAssem(cs, name="fuel a")
 
@@ -469,7 +469,7 @@ assemblies:
 
         # Check that assigning a custom density to the Void material fails
         cs = settings.Settings()
-        cs = cs.modified(newSettings={CONF_XS_KERNEL: "MC2v2"})
+        cs = cs.modified(newSettings={CONF_XS_KERNEL: "MC2v3"})
         bp = blueprints.Blueprints.load(self.yamlStringWithError)
         # Ensure we have some Void
         self.assertEqual(bp.blockDesigns["custom void"]["fuel"].material, "Void")

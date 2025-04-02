@@ -286,23 +286,6 @@ grids:
         self.assertEqual(fa.p.hotChannelFactors, "Default")
         self.assertEqual(fb.p.hotChannelFactors, "Reactor")
 
-    def test_nuclidesMc2v2(self):
-        """Tests that ZR is not expanded to its isotopics for this setting."""
-        cs = settings.Settings()
-        newSettings = {CONF_XS_KERNEL: "MC2v2"}
-        cs = cs.modified(newSettings=newSettings)
-
-        design = blueprints.Blueprints.load(self._yamlString)
-        design._prepConstruction(cs)
-        self.assertTrue(
-            set({"U238", "U235", "ZR"}).issubset(set(design.allNuclidesInProblem))
-        )
-
-        assem = design.constructAssem(cs, name="fuel a")
-        self.assertTrue(
-            set(assem.getNuclides()).issubset(set(design.allNuclidesInProblem))
-        )
-
     def test_nuclidesMc2v3(self):
         """Tests that ZR is expanded to its isotopics for MC2v3."""
         cs = settings.Settings()

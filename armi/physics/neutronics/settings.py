@@ -338,7 +338,7 @@ def defineSettings():
             default="MC2v3",
             label="Lattice Physics Kernel",
             description="Method to determine broad group cross sections for assemblies",
-            options=["", "MC2v2", "MC2v3", "MC2v3-PARTISN", "SERPENT"],
+            options=["", "MC2v3", "MC2v3-PARTISN", "SERPENT"],
         ),
         setting.Setting(
             CONF_LATTICE_PHYSICS_FREQUENCY,

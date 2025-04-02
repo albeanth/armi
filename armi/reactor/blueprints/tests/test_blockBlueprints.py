@@ -14,11 +14,16 @@
 """Tests for block blueprints."""
 import io
 import unittest
+from typing import TYPE_CHECKING
 
 from armi import settings
 from armi.reactor import blueprints
 from armi.reactor.flags import Flags
 from armi.reactor.tests import test_blocks
+
+if TYPE_CHECKING:
+  from armi.reactor.blocks import Block
+  from armi.reactor.assemblies import Assembly
 
 FULL_BP = """
 blocks:
@@ -253,16 +258,28 @@ FULL_BP_GRID = (
 """
 )
 
+class BlockBlueprintsTesting(unittest.TestCase):
 
-class TestGriddedBlock(unittest.TestCase):
+  def setUp(self):
+      self.cs = settings.Settings()
+
+      with io.StringIO(FULL_BP) as stream:
+        self.blueprints = blueprints.Blueprints.load(stream)
+        self.blueprints._prepConstruction(self.cs)
+
+  def loadTestAssemblyFromBP(self) -> "Assembly":
+      """Creates and returns an assembly from blueprints."""
+      aDesign = self.blueprints.assemDesigns.bySpecifier["IC"]
+      return aDesign.construct(self.cs, self.blueprints)
+
+  def loadTestBlockFromBP(self) -> "Block":
+      """Creates a simple assembly from blueprints and returns the first fuel block."""
+      a = self.loadTestAssemblyFromBP()
+      return a.getFirstBlock(Flags.FUEL)
+
+
+class TestGriddedBlock(BlockBlueprintsTesting):
     """Tests for a block that has components in a lattice."""
-
-    def setUp(self):
-        self.cs = settings.Settings()
-
-        with io.StringIO(FULL_BP) as stream:
-            self.blueprints = blueprints.Blueprints.load(stream)
-            self.blueprints._prepConstruction(self.cs)
 
     def test_constructSpatialGrid(self):
         """Test intermediate grid construction function."""
@@ -286,9 +303,7 @@ class TestGriddedBlock(unittest.TestCase):
             :id: T_ARMI_BP_BLOCK
             :tests: R_ARMI_BP_BLOCK
         """
-        aDesign = self.blueprints.assemDesigns.bySpecifier["IC"]
-        a = aDesign.construct(self.cs, self.blueprints)
-        fuelBlock = a.getFirstBlock(Flags.FUEL)
+        fuelBlock = self.loadTestBlockFromBP()
         fuel = fuelBlock.getComponent(Flags.FUEL)
         self.assertTrue(fuel.spatialLocator)
         seen = False
@@ -299,9 +314,7 @@ class TestGriddedBlock(unittest.TestCase):
 
     def test_nonLatticeComponentHasRightMult(self):
         """Make sure non-grid components in blocks with grids get the right multiplicity."""
-        aDesign = self.blueprints.assemDesigns.bySpecifier["IC"]
-        a = aDesign.construct(self.cs, self.blueprints)
-        fuelBlock = a.getFirstBlock(Flags.FUEL)
+        fuelBlock = self.loadTestBlockFromBP()
         duct = fuelBlock.getComponent(Flags.DUCT)
         self.assertEqual(duct.getDimension("mult"), 1.0)
 

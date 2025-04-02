@@ -1363,7 +1363,7 @@ class AnnularFuelTestCase(unittest.TestCase):
 
     def setUp(self):
         self.cs = settings.Settings()
-        newSettings = {CONF_XS_KERNEL: "MC2v2"}  # don't try to expand elementals
+        newSettings = {CONF_XS_KERNEL: "MC2v3"}
         self.cs = self.cs.modified(newSettings=newSettings)
 
         bp = blueprints.Blueprints()

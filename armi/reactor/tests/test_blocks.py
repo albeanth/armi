@@ -47,6 +47,7 @@ from armi.utils.units import (
     MOLES_PER_CC_TO_ATOMS_PER_BARN_CM,
     ASCII_LETTER_a,
 )
+from armi.reactor.blueprints.tests.test_blockBlueprints import BlockBlueprintsTesting
 
 NUM_PINS_IN_TEST_BLOCK = 217
 
@@ -85,7 +86,7 @@ def buildSimpleFuelBlock():
 def loadTestBlock(cold=True, depletable=False) -> blocks.HexBlock:
     """Build an annular test block for evaluating unit tests."""
     caseSetting = settings.Settings()
-    caseSetting[CONF_XS_KERNEL] = "MC2v2"
+    caseSetting[CONF_XS_KERNEL] = "MC2v3"
     runLog.setVerbosity("error")
     caseSetting["nCycles"] = 1
     r = tests.getEmptyHexReactor()
@@ -255,10 +256,9 @@ def loadTestBlock(cold=True, depletable=False) -> blocks.HexBlock:
     return block
 
 
-def applyDummyData(block):
-    """Add some dummy data to a block for physics-like tests."""
-    # typical SFR-ish flux in 1/cm^2/s
-    flux = [
+def applyDummyFlux(block):
+    """Add some typical SFR-ish flux in 1/cm^2/s to a block for physics-like tests."""
+    block.p.mgFlux = [
         161720716762.12997,
         2288219224332.647,
         11068159130271.139,
@@ -293,16 +293,6 @@ def applyDummyData(block):
         1348809158.0353086,
         601494405.293505,
     ]
-    xslib = isotxs.readBinary(ISOTXS_PATH)
-    # slight hack here because the test block was created
-    # by hand rather than via blueprints and so elemental expansion
-    # of isotopics did not occur. But, the ISOTXS library being used
-    # did go through an isotopic expansion, so we map nuclides here.
-    xslib._nuclides["NAAA"] = xslib._nuclides["NA23AA"]
-    xslib._nuclides["WAA"] = xslib._nuclides["W184AA"]
-    xslib._nuclides["MNAA"] = xslib._nuclides["MN55AA"]
-    block.p.mgFlux = flux
-    block.core.lib = xslib
 
 
 def getComponentData(component):
@@ -1780,7 +1770,7 @@ class Block_TestCase(unittest.TestCase):
     def test_setImportantParams(self):
         """Confirm that important block parameters can be set and get."""
         # Test ability to set and get flux
-        applyDummyData(self.block)
+        applyDummyFlux(self.block)
         self.assertEqual(self.block.p.mgFlux[0], 161720716762.12997)
         self.assertEqual(self.block.p.mgFlux[-1], 601494405.293505)
 
@@ -1798,16 +1788,6 @@ class Block_TestCase(unittest.TestCase):
         self.assertEqual(0, self.block.p.THmassFlowRate)
         self.block.p.THmassFlowRate = 10
         self.assertEqual(10, self.block.p.THmassFlowRate)
-
-    def test_getMfp(self):
-        """Test mean free path."""
-        applyDummyData(self.block)
-        # These are unverified numbers, just the result of this calculation.
-        mfp, mfpAbs, diffusionLength = self.block.getMfp()
-        # no point testing these number to high accuracy.
-        assert_allclose(3.9, mfp, rtol=0.1)
-        assert_allclose(235.0, mfpAbs, rtol=0.1)
-        assert_allclose(17.0, diffusionLength, rtol=0.1)
 
     def test_consistentMassDensVolBetweenColdBlockAndComp(self):
         block = self.block
@@ -1991,6 +1971,23 @@ class Block_TestCase(unittest.TestCase):
             block.getReactionRates("PU39"),
             {"nG": 0, "nF": 0, "n2n": 0, "nA": 0, "nP": 0, "n3n": 0},
         )
+
+class TestBlockMFP(BlockBlueprintsTesting):
+
+    def test_getMfp(self):
+        """Test mean free path."""
+        r = tests.getEmptyHexReactor()
+        a = self.loadTestAssemblyFromBP()
+        r.core.add(a)
+        b: blocks.Block = a[0]
+        applyDummyFlux(b)
+        b.core.lib = isotxs.readBinary(ISOTXS_PATH)
+        # These are unverified numbers, just the result of this calculation.
+        mfp, mfpAbs, diffusionLength = b.getMfp()
+        # no point testing these number to high accuracy.
+        self.assertAlmostEqual(6.67499, mfp, places=4)
+        self.assertAlmostEqual(817.92785, mfpAbs, places=4)
+        self.assertAlmostEqual(44.54786, diffusionLength, places=4)
 
 
 class BlockInputHeightsTests(unittest.TestCase):

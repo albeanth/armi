@@ -29,6 +29,7 @@ from armi.reactor.blocks import HexBlock
 from armi.reactor.flags import Flags
 from armi.reactor.tests import test_blocks, test_reactors
 from armi.tests import ISOTXS_PATH
+from armi.reactor.blueprints.tests.test_blockBlueprints import BlockBlueprintsTesting
 
 
 class MockReactorParams:
@@ -356,7 +357,7 @@ class TestGlobalFluxResultMapper(unittest.TestCase):
 
     def test_mapper(self):
         o, r = test_reactors.loadTestReactor(
-            customSettings={CONF_XS_KERNEL: "MC2v2"},
+            customSettings={CONF_XS_KERNEL: "MC2v3"},
             inputFileName="smallestTestReactor/armiRunSmallest.yaml",
         )
         applyDummyFlux(r)
@@ -426,7 +427,7 @@ class TestGlobalFluxResultMapper(unittest.TestCase):
         self.assertEqual(factor, 0.0)
 
 
-class TestGlobalFluxUtils(unittest.TestCase):
+class TestGlobalFluxUtils(BlockBlueprintsTesting):
     def test_calcReactionRates(self):
         """
         Test that the reaction rate code executes and sets a param > 0.0.
@@ -435,10 +436,10 @@ class TestGlobalFluxUtils(unittest.TestCase):
             :id: T_ARMI_FLUX_RX_RATES
             :tests: R_ARMI_FLUX_RX_RATES
         """
-        b = test_blocks.loadTestBlock()
-        test_blocks.applyDummyData(b)
+        b = self.loadTestBlockFromBP()
+        test_blocks.applyDummyFlux(b)
         self.assertAlmostEqual(b.p.rateAbs, 0.0)
-        globalFluxInterface.calcReactionRates(b, 1.01, b.core.lib)
+        globalFluxInterface.calcReactionRates(b, 1.01, isotxs.readBinary(ISOTXS_PATH))
         self.assertGreater(b.p.rateAbs, 0.0)
         vfrac = b.getComponentAreaFrac(Flags.FUEL)
         self.assertEqual(b.p.fisDens, b.p.rateFis / vfrac)

@@ -26,6 +26,7 @@ from armi.reactor.tests import test_assemblies, test_blocks
 from armi.settings.fwSettings.globalSettings import CONF_UNIFORM_MESH_MINIMUM_SIZE
 from armi.testing import loadTestReactor, reduceTestReactorRings
 from armi.tests import ISOTXS_PATH, TEST_ROOT
+from armi.reactor.blueprints.tests.test_blockBlueprints import BlockBlueprintsTesting
 
 
 class DummyFluxOptions:
@@ -221,7 +222,7 @@ class TestUniformMeshGenerator(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         newSettings = {
-            CONF_XS_KERNEL: "MC2v2",
+            CONF_XS_KERNEL: "MC2v3",
             CONF_UNIFORM_MESH_MINIMUM_SIZE: 3.0,
         }
         cls.o, cls.r = loadTestReactor(TEST_ROOT, customSettings=newSettings)
@@ -337,7 +338,7 @@ class TestUniformMeshComponents(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.o, cls.r = loadTestReactor(
-            TEST_ROOT, customSettings={CONF_XS_KERNEL: "MC2v2"}
+            TEST_ROOT, customSettings={CONF_XS_KERNEL: "MC2v3"}
         )
         reduceTestReactorRings(cls.r, cls.o.cs, 4)
         cls.r.core.lib = isotxs.readBinary(ISOTXS_PATH)
@@ -399,7 +400,7 @@ class TestUniformMesh(unittest.TestCase):
 
     def setUp(self):
         self.o, self.r = loadTestReactor(
-            TEST_ROOT, customSettings={CONF_XS_KERNEL: "MC2v2"}
+            TEST_ROOT, customSettings={CONF_XS_KERNEL: "MC2v3"}
         )
         reduceTestReactorRings(self.r, self.o.cs, 3)
         self.r.core.lib = isotxs.readBinary(ISOTXS_PATH)
@@ -498,7 +499,7 @@ class TestUniformMesh(unittest.TestCase):
                 self.assertTrue(b.p.rateCap)
 
 
-class TestCalcReationRates(unittest.TestCase):
+class TestCalcReationRates(BlockBlueprintsTesting):
     def test_calcReactionRatesBlockList(self):
         """
         Test that the efficient reaction rate code executes and sets a param > 0.0.
@@ -507,12 +508,17 @@ class TestCalcReationRates(unittest.TestCase):
             :id: T_ARMI_FLUX_RX_RATES_BY_XS_ID
             :tests: R_ARMI_FLUX_RX_RATES
         """
-        b = test_blocks.loadTestBlock()
-        test_blocks.applyDummyData(b)
+        b = self.loadTestBlockFromBP()
+        test_blocks.applyDummyFlux(b)
         self.assertAlmostEqual(b.p.rateAbs, 0.0)
         blockList = [copy.deepcopy(b) for _i in range(3)]
         xsID = b.getMicroSuffix()
-        xsNucDict = {nuc: b.core.lib.getNuclide(nuc, xsID) for nuc in b.getNuclides()}
+        lib = isotxs.readBinary(ISOTXS_PATH)
+        xsNucDict = {
+            nuc: lib.getNuclide(nuc, xsID)
+            for nuc in b.getNuclides()
+            if nuc not in ["DUMP1", "DUMP2", "LFP35", "LFP38", "LFP39", "LFP40", "LFP41"]
+        }
         uniformMesh.UniformMeshGeometryConverter._calcReactionRatesBlockList(
             blockList, 1.01, xsNucDict
         )
@@ -537,7 +543,7 @@ class TestGammaUniformMesh(unittest.TestCase):
 
     def setUp(self):
         self.o, self.r = loadTestReactor(
-            TEST_ROOT, customSettings={CONF_XS_KERNEL: "MC2v2"}
+            TEST_ROOT, customSettings={CONF_XS_KERNEL: "MC2v3"}
         )
         self.r.core.lib = isotxs.readBinary(ISOTXS_PATH)
         self.r.core.p.keff = 1.0
@@ -728,7 +734,7 @@ class TestUniformMeshNonUniformAssemFlags(unittest.TestCase):
         self.o, self.r = loadTestReactor(
             TEST_ROOT,
             customSettings={
-                CONF_XS_KERNEL: "MC2v2",
+                CONF_XS_KERNEL: "MC2v3",
                 "nonUniformAssemFlags": ["primary control"],
             },
         )
