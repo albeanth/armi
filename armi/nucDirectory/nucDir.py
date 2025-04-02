@@ -222,19 +222,19 @@ def getNuclide(nucName):
     return nuc
 
 
-def getNuclides(nucName=None, elementSymbol=None):
+def getNuclides(nucName: str = None, elementSymbol: str = None) -> list[nuclideBases.NuclideBase]:
     """
-    Returns a list of nuclide names in a particular nuclide or element.
+    Returns a list of nuclides in a particular nuclide or element.
 
-    If no arguments, returns all nuclideBases in the directory
+    If no arguments, returns all nuclideBases
 
     Used to convert things to DB name, to adjustNuclides, etc.
 
     Parameters
     ----------
-    nucName : str
+    nucName
         ARMI nuclide label
-    elementSymbol : str
+    elementSymbol
         Element symbol e.g. 'Zr'
     """
     if nucName:
@@ -243,8 +243,7 @@ def getNuclides(nucName=None, elementSymbol=None):
     elif elementSymbol:
         nucList = elements.bySymbol[elementSymbol].nuclides
     else:
-        # all nuclideBases, including shortcut nuclideBases ('CARB')
-        nucList = [nuc for nuc in nuclideBases.instances if nuc.getMcc2Id() is not None]
+        nucList = [nuc for nuc in nuclideBases.instances]
 
     return nucList
 
