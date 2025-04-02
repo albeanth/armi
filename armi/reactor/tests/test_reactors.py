@@ -629,9 +629,7 @@ class HexReactorTests(ReactorTests):
         self.assertEqual(19, nAssems)
 
     def test_getNumEnergyGroups(self):
-        # this Core doesn't have a loaded ISOTXS library, so this test is minimally useful
-        with self.assertRaises(AttributeError):
-            self.r.core.getNumEnergyGroups()
+        self.assertEqual(self.r.core.getNumEnergyGroups(), 33)
 
     def test_getMinimumPercentFluxInFuel(self):
         # there is no flux in the test reactor YET, so this test is minimally useful
