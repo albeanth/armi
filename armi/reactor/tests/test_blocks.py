@@ -20,6 +20,7 @@ import shutil
 import unittest
 from glob import glob
 from unittest.mock import MagicMock, patch
+from typing import TYPE_CHECKING
 
 import numpy as np
 from numpy.testing import assert_allclose
@@ -47,9 +48,149 @@ from armi.utils.units import (
     MOLES_PER_CC_TO_ATOMS_PER_BARN_CM,
     ASCII_LETTER_a,
 )
-from armi.reactor.blueprints.tests.test_blockBlueprints import BlockBlueprintsTesting
+
+if TYPE_CHECKING:
+  from armi.reactor.blocks import Block
+  from armi.reactor.assemblies import Assembly
 
 NUM_PINS_IN_TEST_BLOCK = 217
+
+
+FULL_BP = """
+blocks:
+    fuel: &block_fuel
+        grid name: fuelgrid
+        fuel:
+            shape: Circle
+            material: UZr
+            Tinput: 25.0
+            Thot: 600.0
+            id: 0.0
+            od: 0.7
+            latticeIDs: [1]
+        clad: # same args as test_blocks (except mult)
+            shape: Circle
+            material: HT9
+            Tinput: 25.0
+            Thot: 450.0
+            id: .77
+            od: .80
+            latticeIDs: [1,2]
+        coolant:
+            shape: DerivedShape
+            material: Sodium
+            Tinput: 450.0
+            Thot: 450.0
+        duct:
+            shape: Hexagon
+            material: HT9
+            Tinput: 25.0
+            Thot: 450.0
+            ip: 16.0
+            mult: 1.0
+            op: 16.6
+        intercoolant:
+            shape: Hexagon
+            material: Sodium
+            Tinput: 450.0
+            Thot: 450.0
+            ip: duct.op
+            mult: 1.0
+            op: 16.75
+    other fuel: &block_fuel_other
+        grid name: fuelgrid
+        flags: fuel test depletable
+        fuel:
+            shape: Circle
+            material: UZr
+            Tinput: 25.0
+            Thot: 600.0
+            id: 0.0
+            od: 0.67
+            latticeIDs: [1]
+        clad:
+            shape: Circle
+            material: HT9
+            Tinput: 25.0
+            Thot: 450.0
+            id: .77
+            od: .80
+            latticeIDs: [1,2]
+        coolant:
+            shape: DerivedShape
+            material: Sodium
+            Tinput: 450.0
+            Thot: 450.0
+        duct:
+            shape: Hexagon
+            material: HT9
+            Tinput: 25.0
+            Thot: 450.0
+            ip: 16.0
+            mult: 1.0
+            op: 16.6
+        intercoolant:
+            shape: Hexagon
+            material: Sodium
+            Tinput: 450.0
+            Thot: 450.0
+            ip: duct.op
+            mult: 1.0
+            op: 16.75
+assemblies:
+    fuel:
+        specifier: IC
+        blocks:  [*block_fuel, *block_fuel_other]
+        height: [25.0, 25.0]
+        axial mesh points:  [1, 1]
+        material modifications:
+            U235_wt_frac: [0.11, 0.11]
+            ZR_wt_frac:  [0.06, 0.06]
+        xs types: [A, A]
+    fuel other:
+        flags: fuel test
+        specifier: ID
+        blocks:  [*block_fuel, *block_fuel_other]
+        height: [25.0, 25.0]
+        axial mesh points:  [1, 1]
+        material modifications:
+            U235_wt_frac: [0.11, 0.11]
+            ZR_wt_frac:  [0.06, 0.06]
+        xs types: [A, A]
+grids:
+    fuelgrid:
+       geom: hex_corners_up
+       symmetry: full
+       lattice map: |
+         - - -  1 1 1 1
+           - - 1 1 2 1 1
+            - 1 1 1 1 1 1
+             1 3 1 2 1 3 1
+              1 1 1 1 1 1
+               1 1 2 1 1
+                1 1 1 1
+
+"""
+
+
+class BlockBlueprintsTesting(unittest.TestCase):
+
+  def setUp(self):
+      self.cs = settings.Settings()
+
+      with io.StringIO(FULL_BP) as stream:
+        self.blueprints = blueprints.Blueprints.load(stream)
+        self.blueprints._prepConstruction(self.cs)
+
+  def loadTestAssemblyFromBP(self) -> "Assembly":
+      """Creates and returns an assembly from blueprints."""
+      aDesign = self.blueprints.assemDesigns.bySpecifier["IC"]
+      return aDesign.construct(self.cs, self.blueprints)
+
+  def loadTestBlockFromBP(self) -> "Block":
+      """Creates a simple assembly from blueprints and returns the first fuel block."""
+      a = self.loadTestAssemblyFromBP()
+      return a.getFirstBlock(Flags.FUEL)
 
 
 def buildSimpleFuelBlock():
@@ -310,7 +451,6 @@ def getComponentData(component):
 
 class TestDetailedNDensUpdate(unittest.TestCase):
     def test_updateDetailedNdens(self):
-        from armi.reactor.blueprints.tests.test_blockBlueprints import FULL_BP
 
         cs = settings.Settings()
         with io.StringIO(FULL_BP) as stream:

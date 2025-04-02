@@ -24,6 +24,125 @@ from armi.reactor import systemLayoutInput
 from armi.reactor.blueprints import Blueprints
 from armi.reactor.blueprints.gridBlueprint import Grids, saveToStream
 from armi.utils.directoryChangers import TemporaryDirectoryChanger
+from armi.reactor.tests.test_blocks import FULL_BP
+
+
+FULL_BP_GRID = (
+    FULL_BP.split("lattice map:")[0]
+    + """grid contents:
+         ? - -3
+           - 3
+         : '1'
+         ? - -2
+           - 3
+         : '1'
+         ? - -1
+           - 3
+         : '1'
+         ? - 0
+           - 3
+         : '1'
+         ? - -3
+           - 2
+         : '1'
+         ? - -2
+           - 2
+         : '1'
+         ? - -1
+           - 2
+         : '2'
+         ? - 0
+           - 2
+         : '1'
+         ? - 1
+           - 2
+         : '1'
+         ? - -3
+           - 1
+         : '1'
+         ? - -2
+           - 1
+         : '1'
+         ? - -1
+           - 1
+         : '1'
+         ? - 0
+           - 1
+         : '1'
+         ? - 1
+           - 1
+         : '1'
+         ? - 2
+           - 1
+         : '1'
+         ? - -3
+           - 0
+         : '1'
+         ? - -2
+           - 0
+         : '3'
+         ? - -1
+           - 0
+         : '1'
+         ? - 0
+           - 0
+         : '2'
+         ? - 1
+           - 0
+         : '1'
+         ? - 2
+           - 0
+         : '3'
+         ? - 3
+           - 0
+         : '1'
+         ? - -2
+           - -1
+         : '1'
+         ? - -1
+           - -1
+         : '1'
+         ? - 0
+           - -1
+         : '1'
+         ? - 1
+           - -1
+         : '1'
+         ? - 2
+           - -1
+         : '1'
+         ? - 3
+           - -1
+         : '1'
+         ? - -1
+           - -2
+         : '1'
+         ? - 0
+           - -2
+         : '1'
+         ? - 1
+           - -2
+         : '2'
+         ? - 2
+           - -2
+         : '1'
+         ? - 3
+           - -2
+         : '1'
+         ? - 0
+           - -3
+         : '1'
+         ? - 1
+           - -3
+         : '1'
+         ? - 2
+           - -3
+         : '1'
+         ? - 3
+           - -3
+         : '1'
+"""
+)
 
 LATTICE_BLUEPRINT = """
 control:
@@ -400,8 +519,6 @@ class TestGridBlueprintsSection(unittest.TestCase):
             :id: T_ARMI_BP_GRID0
             :tests: R_ARMI_BP_GRID
         """
-        from armi.reactor.blueprints.tests.test_blockBlueprints import FULL_BP
-
         # Cartesian full, even/odd hybrid
         gridDesign4 = self.grids["sfp even"]
         _grid = gridDesign4.construct()
@@ -433,8 +550,6 @@ class TestGridBlueprintsSection(unittest.TestCase):
         self.assertTrue(os.path.exists(filePath))
 
     def test_simpleReadNoLatticeMap(self):
-        from armi.reactor.blueprints.tests.test_blockBlueprints import FULL_BP_GRID
-
         # Cartesian full, even/odd hybrid
         gridDesign4 = self.grids["sfp even"]
         _grid = gridDesign4.construct()
