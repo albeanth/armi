@@ -311,7 +311,6 @@ armi = [
     "nuclearDataIO/tests/library-file-generation",
     "nuclearDataIO/tests/library-file-generation/combine-AA-AB.inp",
     "nuclearDataIO/tests/library-file-generation/combine-and-lump-AA-AB.inp",
-    "nuclearDataIO/tests/library-file-generation/mc2v2-dlayxs.inp",
     "nuclearDataIO/tests/library-file-generation/mc2v3-AA.inp",
     "nuclearDataIO/tests/library-file-generation/mc2v3-AB.inp",
     "nuclearDataIO/tests/library-file-generation/mc2v3-dlayxs.inp",
