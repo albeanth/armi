@@ -381,27 +381,6 @@ class TestNuclide(unittest.TestCase):
         activity = activity * CURIE_PER_BECQUEREL
         self.assertAlmostEqual(activity, 0.9885593, places=6)
 
-    def test_loadMcc2Data(self):
-        """Tests consistency with the `mcc-nuclides.yaml` input and the ENDF/B-V.2 nuclides in the data model.
-
-        .. test:: Test that MCC v2 ENDF/B-V.2 IDs can be queried by nuclides.
-            :id: T_ARMI_ND_ISOTOPES3
-            :tests: R_ARMI_ND_ISOTOPES
-        """
-        with open(os.path.join(RES, "mcc-nuclides.yaml")) as f:
-            yaml = YAML(typ="rt")
-            data = yaml.load(f)
-            expectedNuclides = set(
-                [nuc for nuc in data.keys() if data[nuc]["ENDF/B-V.2"] is not None]
-            )
-
-        for nuc, nb in nuclideBases.byMcc2Id.items():
-            self.assertIn(nb.name, expectedNuclides)
-            self.assertEqual(nb.getMcc2Id(), nb.mcc2id)
-            self.assertEqual(nb.getMcc2Id(), nuc)
-
-        self.assertEqual(len(nuclideBases.byMcc2Id), len(expectedNuclides))
-
     def test_loadMcc3EndfVII0Data(self):
         """Tests consistency with the `mcc-nuclides.yaml` input and the ENDF/B-VII.0 nuclides in the data model.
 

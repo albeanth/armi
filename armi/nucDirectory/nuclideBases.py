@@ -113,7 +113,6 @@ from armi.nucDirectory import elements  # noqa: E402
 byName = {}
 byDBName = {}
 byLabel = {}
-byMcc2Id = {}
 byMcc3Id = {}  # for backwards compatibility. Identical to byMcc3IdEndfbVII1
 byMcc3IdEndfbVII0 = {}
 byMcc3IdEndfbVII1 = {}
@@ -158,10 +157,6 @@ class NuclideInterface:
         decay : :py:class:`DecayModes <armi.nucDirectory.transmutations.DecayMode>`
         """
         raise NotImplementedError
-
-    def getMcc2Id(self):
-        """Return the MC2-2 nuclide identification label based on the ENDF/B-V.2 cross section library."""
-        return NotImplementedError
 
     def getMcc3Id(self):
         """Return the MC2-3 nuclide identification label based on the ENDF/B-VII.1 cross section library."""
@@ -242,10 +237,6 @@ class NuclideWrapper(NuclideInterface):
         """
         return self._base.getDecay(decayType)
 
-    def getMcc2Id(self):
-        """Return the MC2-2 nuclide based on the ENDF/B-V.2 cross section library."""
-        return self._base.getMcc2Id()
-
     def getMcc3Id(self):
         """Return the MC2-3 nuclide based on the ENDF/B-VII.1 cross section library."""
         return self.getMcc3IdEndfbVII1()
@@ -323,7 +314,6 @@ class INuclide(NuclideInterface):
         halflife,
         name,
         label,
-        mcc2id=None,
         mcc3idEndfbVII0=None,
         mcc3idEndfbVII1=None,
     ):
@@ -360,7 +350,6 @@ class INuclide(NuclideInterface):
         self.name = name
         self.label = label
         self.nuSF = 0.0
-        self.mcc2id = mcc2id or ""
         self.mcc3idEndfbVII0 = mcc3idEndfbVII0 or ""
         self.mcc3idEndfbVII1 = mcc3idEndfbVII1 or ""
         addGlobalNuclide(self)
@@ -592,20 +581,6 @@ class NuclideBase(INuclide, IMcnpNuclide):
         """
         return self.element.getNaturalIsotopics()
 
-    def getMcc2Id(self):
-        """Return the MC2-2 nuclide identification label based on the ENDF/B-V.2 cross section library.
-
-        .. impl:: Isotopes and isomers can be queried by MC2-2 ID.
-            :id: I_ARMI_ND_ISOTOPES2
-            :implements: R_ARMI_ND_ISOTOPES
-
-            This method returns the ``mcc2id`` attribute of a
-            :py:class:`NuclideBase <armi.nucDirectory.nuclideBases.NuclideBase>`
-            instance.  This attribute is initially populated by reading from the
-            mcc-nuclides.yaml file in the ARMI resources folder.
-        """
-        return self.mcc2id
-
     def getMcc3Id(self):
         """Return the MC2-3 nuclide identification label based on the ENDF/B-VII.1 cross section library."""
         return self.getMcc3IdEndfbVII1()
@@ -794,10 +769,6 @@ class NaturalNuclideBase(INuclide, IMcnpNuclide):
         """
         return "{0:d}000".format(self.z)
 
-    def getMcc2Id(self):
-        """Return the MC2-2 nuclide identification label based on the ENDF/B-V.2 cross section library."""
-        return self.mcc2id
-
     def getMcc3Id(self):
         """Return the MC2-3 nuclide identification label based on the ENDF/B-VII.1 cross section library."""
         return self.getMcc3IdEndfbVII1()
@@ -890,10 +861,6 @@ class DummyNuclideBase(INuclide):
     def isHeavyMetal(self):
         return False
 
-    def getMcc2Id(self):
-        """Return the MC2-2 nuclide identification label based on the ENDF/B-V.2 cross section library."""
-        return self.mcc2id
-
     def getMcc3Id(self):
         """Return the MC2-3 nuclide identification label based on the ENDF/B-VII.1 cross section library."""
         return self.getMcc3IdEndfbVII1()
@@ -963,10 +930,6 @@ class LumpNuclideBase(INuclide):
 
     def isHeavyMetal(self):
         return False
-
-    def getMcc2Id(self):
-        """Return the MC2-2 nuclide identification label based on the ENDF/B-V.2 cross section library."""
-        return self.mcc2id
 
     def getMcc3Id(self):
         """Return the MC2-3 nuclide identification label based on the ENDF/B-VII.1 cross section library."""
@@ -1314,7 +1277,6 @@ def readMCCNuclideData():
         the data is read, and the global dictionaries ``byMcc3IdEndfVII0`` and ``byMcc3IdEndfVII1``
         are populated with the nuclide bases keyed by their corresponding ID for each code.
     """
-    global byMcc2Id
     global byMcc3Id
     global byMcc3IdEndfbVII0
     global byMcc3IdEndfbVII1
@@ -1325,12 +1287,8 @@ def readMCCNuclideData():
 
     for n in nuclides:
         nb = byName[n]
-        mcc2id = nuclides[n]["ENDF/B-V.2"]
         mcc3idEndfbVII0 = nuclides[n]["ENDF/B-VII.0"]
         mcc3idEndfbVII1 = nuclides[n]["ENDF/B-VII.1"]
-        if mcc2id is not None:
-            nb.mcc2id = mcc2id
-            byMcc2Id[nb.getMcc2Id()] = nb
         if mcc3idEndfbVII0 is not None:
             nb.mcc3idEndfbVII0 = mcc3idEndfbVII0
             byMcc3IdEndfbVII0[nb.getMcc3IdEndfbVII0()] = nb
@@ -1429,7 +1387,6 @@ def destroyGlobalNuclides():
     global byName
     global byDBName
     global byLabel
-    global byMcc2Id
     global byMcc3Id
     global byMcc3IdEndfbVII0
     global byMcc3IdEndfbVII1
@@ -1440,7 +1397,6 @@ def destroyGlobalNuclides():
     byName.clear()
     byDBName.clear()
     byLabel.clear()
-    byMcc2Id.clear()
     byMcc3Id.clear()
     byMcc3IdEndfbVII1.clear()
     byMcc3IdEndfbVII0.clear()
