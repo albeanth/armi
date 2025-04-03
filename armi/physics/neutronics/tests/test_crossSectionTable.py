@@ -49,7 +49,7 @@ class TestCrossSectionTable(unittest.TestCase):
         self.assertTrue(table.hasValues())
 
         xSecTable = table.getXsecTable()
-        self.assertEqual(len(xSecTable), 11)
+        self.assertEqual(len(xSecTable), 4)
         self.assertIn("xsecs", xSecTable[0])
         self.assertIn("mcnpId", xSecTable[-1])
 
