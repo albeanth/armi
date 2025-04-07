@@ -17,13 +17,13 @@ import unittest
 
 from armi.nucDirectory import nuclideBases
 from armi.nuclearDataIO import isotxs, xsLibraries, xsNuclides
-from armi.tests import ISOAA_PATH, mockRunLogs
+from armi.tests import ISOTXS_PATH, mockRunLogs
 
 
 class NuclideTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.lib = isotxs.readBinary(ISOAA_PATH)
+        cls.lib = isotxs.readBinary(ISOTXS_PATH)
 
     def test_nucl_createFromLabelFailsOnBadName(self):
         nuc = xsNuclides.XSNuclide(None, "BACONAA")
@@ -88,6 +88,7 @@ class NuclideTests(unittest.TestCase):
             self.assertIsInstance(nuc.getMcc3Id(), str)
 
     def test_nuclide_isoaaDetails(self):
+        # TODO: Is this a useful test? Maybe making sure fission nG/2n xs are non-zero and chi is > 1.0? Discuss with Aaron.
         nuc = self.lib["U235AA"]
         self.assertEqual(935.9793848991394, sum(nuc.micros.fission))
         self.assertEqual(1.0000000956962505, sum(nuc.micros.chi))
@@ -99,11 +100,13 @@ class NuclideTests(unittest.TestCase):
 
     def test_nuclide_2dXsArrangementIsCorrect(self):
         """Manually compare some 2d XS data to ensure the correct coordinates."""
+        # TODO: Is this a useful test? The size of these is 33x4? Maybe it makes more sense to check for array size?
+        #       Touch base with Aaron.
         u235 = self.lib["U235AA"]
-        self.assertAlmostEqual(5.76494979858, u235.micros.total[0, 0])
-        self.assertAlmostEqual(6.5928812027, u235.micros.total[1, 0])
-        self.assertAlmostEqual(113.00479126, u235.micros.total[31, 0])
-        self.assertAlmostEqual(606.100097656, u235.micros.total[32, 0])
+        self.assertAlmostEqual(5.7586903572, u235.micros.total[0, 0])
+        self.assertAlmostEqual(6.5533275604, u235.micros.total[1, 0])
+        self.assertAlmostEqual(117.43510437, u235.micros.total[31, 0])
+        self.assertAlmostEqual(139.90669251, u235.micros.total[32, 0])
         self.assertAlmostEqual(5.7647356987, u235.micros.total[0, 1])
         self.assertAlmostEqual(6.58178663254, u235.micros.total[1, 1])
         self.assertAlmostEqual(112.154449463, u235.micros.total[31, 1])
@@ -120,6 +123,7 @@ class NuclideTests(unittest.TestCase):
 
     def test_nuclide_scatterXsArrangementIsCorrect(self):
         """Manually compare scatter XS data to ensure the correct coordinates."""
+        # TODO: Is this a useful test? Maybe it makes more sense to check for array size again? Touch base with Aaron.
         u235 = self.lib["U235AA"]
         elasticScatter = u235.micros.elasticScatter
         n2nScatter = u235.micros.n2nScatter

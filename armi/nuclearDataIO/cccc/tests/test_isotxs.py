@@ -18,7 +18,7 @@ from armi import nuclearDataIO
 from armi.nucDirectory import nuclideBases
 from armi.nuclearDataIO import xsLibraries
 from armi.nuclearDataIO.cccc import isotxs
-from armi.tests import ISOAA_PATH
+from armi.tests import ISOTXS_PATH
 from armi.utils.directoryChangers import TemporaryDirectoryChanger
 
 
@@ -29,7 +29,7 @@ class TestIsotxs(unittest.TestCase):
     def setUpClass(cls):
         # load a library that is in the ARMI tree. This should
         # be a small library with LFPs, Actinides, structure, and coolant
-        cls.lib = isotxs.readBinary(ISOAA_PATH)
+        cls.lib = isotxs.readBinary(ISOTXS_PATH)
 
     def test_writeBinary(self):
         """Test reading in an ISOTXS file, and then writing it back out again.
@@ -43,7 +43,7 @@ class TestIsotxs(unittest.TestCase):
             :tests: R_ARMI_NUCDATA_ISOTXS
         """
         with TemporaryDirectoryChanger():
-            origLib = isotxs.readBinary(ISOAA_PATH)
+            origLib = isotxs.readBinary(ISOTXS_PATH)
 
             fname = self._testMethodName + "temp-aa.isotxs"
             isotxs.writeBinary(origLib, fname)
@@ -68,55 +68,20 @@ class TestIsotxs(unittest.TestCase):
             self.lib.getNuclide("nonexistent", "zz")
 
     def test_isotxsDetailedData(self):
-        self.assertEqual(50, len(self.lib.nuclides))
+        self.assertEqual(423, len(self.lib.nuclides))
         groups = self.lib.neutronEnergyUpperBounds
         self.assertEqual(33, len(groups))
-        self.assertEqual(14072911.0, max(groups))
-        self.assertEqual(0.4139941930770874, min(groups))
+        self.assertEqual(14190675.0, max(groups))
+        self.assertEqual(0.41745778918266296, min(groups))
+        ## TODO: Chi is missing from ISOTXS. Ping Aaron.
         # file-wide chi
-        self.assertEqual(33, len(self.lib.isotxsMetadata["chi"]))
-        self.assertEqual(1.0000016745038094, sum(self.lib.isotxsMetadata["chi"]))
+        # self.assertEqual(33, len(self.lib.isotxsMetadata["chi"]))
+        # self.assertEqual(1.0000016745038094, sum(self.lib.isotxsMetadata["chi"]))
 
     def test_getScatteringWeights(self):
-        self.assertEqual(1650, len(self.lib.getScatterWeights()))
-        refVector = [
-            0.0,
-            0.9924760291647134,
-            0.007523970835286507,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-        ]
-        for v1, v2 in zip(
-            refVector, self.lib.getScatterWeights()["U235AA", 1].todense().T.tolist()[0]
-        ):
+        self.assertEqual(13959, len(self.lib.getScatterWeights()))
+        refVector = [0.99365816, 0.00634184]
+        for v1, v2 in zip(refVector, self.lib.getScatterWeights()["U235AA", 1].data):
             self.assertAlmostEqual(v1, v2)
 
     def test_getNuclide(self):
@@ -134,6 +99,7 @@ class TestIsotxs(unittest.TestCase):
         The alternative is production based.
         Previous studies show that MC**2-2 is reaction based.
         """
+        # TODO: Check with Aaron on this
         nuc = self.lib.getNuclide("U235", "AA")
         fromMatrix = nuc.micros.n2nScatter.sum(axis=0).getA1()  # convert to ndarray
         for base, matrix in zip(fromMatrix, nuc.micros.n2n):
@@ -142,7 +108,7 @@ class TestIsotxs(unittest.TestCase):
     def test_getScatterWeights(self):
         scatWeights = self.lib.getScatterWeights()
         vals = scatWeights["U235AA", 4]
-        self.assertAlmostEqual(sum(vals), 1.0)
+        self.assertAlmostEqual(sum(vals.data), 1.0)
 
     def test_getISOTXSFileName(self):
         self.assertEqual(nuclearDataIO.getExpectedISOTXSFileName(cycle=0), "ISOTXS-c0")
@@ -198,16 +164,16 @@ class Isotxs_merge_Tests(unittest.TestCase):
             :id: T_ARMI_NUCDATA_ISOTXS1
             :tests: R_ARMI_NUCDATA_ISOTXS
         """
-        isoaa = isotxs.readBinary(ISOAA_PATH)
-        self.assertAlmostEqual(1.0, sum(isoaa.isotxsMetadata["chi"]), 5)
-        self.assertAlmostEqual(1, isoaa.isotxsMetadata["fileWideChiFlag"])
+        isotxs = isotxs.readBinary(ISOTXS_PATH)
+        self.assertAlmostEqual(1.0, sum(isotxs.isotxsMetadata["chi"]), 5)
+        self.assertAlmostEqual(1, isotxs.isotxsMetadata["fileWideChiFlag"])
         someIsotxs = xsLibraries.IsotxsLibrary()
         # semi-copy...
-        someIsotxs.merge(isoaa)
+        someIsotxs.merge(isotxs)
         self.assertAlmostEqual(1.0, sum(someIsotxs.isotxsMetadata["chi"]), 5)
         self.assertEqual(1, someIsotxs.isotxsMetadata["fileWideChiFlag"])
         # OK, now I need to delete all the nuclides, so we can merge again.
         for key in someIsotxs.nuclideLabels:
             del someIsotxs[key]
-        someIsotxs.merge(isotxs.readBinary(ISOAA_PATH))
+        someIsotxs.merge(isotxs.readBinary(ISOTXS_PATH))
         self.assertEqual(None, someIsotxs.isotxsMetadata["chi"])
