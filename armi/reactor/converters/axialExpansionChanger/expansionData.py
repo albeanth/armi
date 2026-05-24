@@ -290,21 +290,15 @@ class ExpansionData:
             multiple target components found
         """
         if flagOfInterest is None:
-            # Follow expansion of most neutronically important component, fuel then control/poison
-            for targetFlag in TARGET_FLAGS_IN_PREFERRED_ORDER:
-                candidates = b.getChildrenWithFlags(targetFlag)
-                if candidates:
-                    break
-            # some blocks/components are not included in the above list but should still be found
+            candidates = self._findCandidatesByPreferredFlags(b)
             if not candidates:
-                candidates = [c for c in b.getChildren() if c.p.flags in b.p.flags]
+                candidates = self._findCandidatesByBlockFlags(b)
         else:
             candidates = b.getChildrenWithFlags(flagOfInterest)
-        if len(candidates) == 0:
-            # if only 1 solid, be smart enought to snag it
-            solidMaterials = getSolidComponents(b)
-            if len(solidMaterials) == 1:
-                candidates = solidMaterials
+
+        if not candidates:
+            candidates = self._fallbackToSingleSolidComponent(b)
+
         if len(candidates) == 0:
             raise RuntimeError(f"No target component found!\n   Block {b}")
         if len(candidates) > 1:
@@ -319,7 +313,29 @@ class ExpansionData:
         self._setExpansionTarget(b, target)
         return target
 
-    def _setExpansionTarget(self, b: "Block", target: "Component"):
+    def _findCandidatesByPreferredFlags(self, b: "Block") -> list["Component"]:
+        """Return candidate components for the first preferred target flag found.
+        
+        Notes
+        -----
+        Follow most neutronically important component, e.g., fuel then control/poison.
+        """
+        for targetFlag in TARGET_FLAGS_IN_PREFERRED_ORDER:
+            candidates = b.getChildrenWithFlags(targetFlag)
+            if candidates:
+                return candidates
+        return []
+
+    def _findCandidatesByBlockFlags(self, b: "Block") -> list["Component"]:
+        """Return candidate components that match the block's flags."""
+        return [c for c in b.getChildren() if c.p.flags in b.p.flags]
+
+    def _fallbackToSingleSolidComponent(self, b: "Block") -> list["Component"]:
+        """Return the single solid component in a block, if only one exists."""
+        solidMaterials = getSolidComponents(b)
+        return solidMaterials if len(solidMaterials) == 1 else []
+
+    def _setExpansionTarget(self, b: "Block", target: "Component") -> None:
         self._componentDeterminesBlockHeight[target] = True
         b.p.axialExpTargetComponent = target.name
 
